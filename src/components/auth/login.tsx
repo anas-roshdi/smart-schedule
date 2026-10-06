@@ -1,0 +1,133 @@
+import { CalendarDays, Eye, EyeOff } from 'lucide-react-native';
+import { useState } from 'react';
+import { Text, TextInput, TouchableOpacity, View } from 'react-native';
+import type { AuthView } from './auth-container';
+
+interface LoginProps {
+  onNavigate: (view: AuthView) => void;
+  onAuthSuccess: () => void;
+}
+
+export function Login({ onNavigate, onAuthSuccess }: LoginProps) {
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+  const [emailError, setEmailError] = useState('');
+
+  const validateEmail = (val: string) => {
+    const isValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(val);
+    if (!isValid && val.trim() !== '') {
+      setEmailError('صيغة البريد الإلكتروني غير صحيحة');
+    } else {
+      setEmailError('');
+    }
+    return isValid;
+  };
+
+  const handleLogin = () => {
+    if (validateEmail(email)) {
+      // Proceed with login logic
+      console.log('Login attempt', { email, password });
+      onAuthSuccess();
+    }
+  };
+
+  return (
+    <View className="flex-1 justify-center px-6">
+      <View className="h-24 w-24 rounded-full bg-indigo-100 items-center justify-center mb-6 self-center">
+        <CalendarDays color="#4f46e5" size={40} />
+      </View>
+
+      <Text style={{ textAlign: 'left', writingDirection: 'rtl', lineHeight: 42 }} className="mb-2 pb-1 text-3xl font-extrabold text-slate-900 text-center">
+        مرحباً بك في جدولي الذكي
+      </Text>
+      <Text style={{ textAlign: 'left', writingDirection: 'rtl', lineHeight: 24 }} className="mb-8 text-sm text-slate-500 text-center px-4">
+        سجل دخولك لإدارة جدولك الجامعي بذكاء
+      </Text>
+
+      {/* Email Field */}
+      <View className="mb-4">
+        <Text style={{ textAlign: 'left', writingDirection: 'rtl', width: '100%' }} className="mb-2 text-sm font-bold text-slate-700">
+          البريد الإلكتروني
+        </Text>
+        <TextInput
+          className={`rounded-xl border ${emailError ? 'border-red-500' : 'border-slate-200'} bg-slate-50 p-4 text-base text-slate-900`}
+          style={{ textAlign: 'right', writingDirection: 'rtl', textAlignVertical: 'center', includeFontPadding: false }}
+          placeholder="example@student.edu.sa"
+          placeholderTextColor="#64748b"
+          keyboardType="email-address"
+          autoCapitalize="none"
+          value={email}
+          onChangeText={(val) => {
+            setEmail(val);
+            if (emailError) setEmailError('');
+          }}
+          onBlur={() => validateEmail(email)}
+        />
+        {!!emailError && (
+          <Text style={{ textAlign: 'left', writingDirection: 'rtl', width: '100%' }} className="mt-1 text-xs text-red-500">
+            {emailError}
+          </Text>
+        )}
+      </View>
+
+      {/* Password Field */}
+      <View className="mb-4">
+        <Text style={{ textAlign: 'left', writingDirection: 'rtl', width: '100%' }} className="mb-2 text-sm font-bold text-slate-700">
+          كلمة المرور
+        </Text>
+        {/* The container explicitly disables RTL mirroring for layout positioning */}
+        <View style={{ direction: 'ltr', position: 'relative', justifyContent: 'center' }}>
+          <TextInput
+            className="rounded-xl border border-slate-200 bg-slate-50 p-4 text-base text-slate-900"
+            style={{ paddingLeft: 48, paddingRight: 16, textAlign: 'right', writingDirection: 'rtl', textAlignVertical: 'center', includeFontPadding: false }}
+            placeholder="أدخل كلمة المرور"
+            placeholderTextColor="#64748b"
+            secureTextEntry={!showPassword}
+            value={password}
+            onChangeText={setPassword}
+          />
+          {/* Absolute Left button - explicit zIndex and pixel left position */}
+          <TouchableOpacity
+            onPress={() => setShowPassword(!showPassword)}
+            style={{ position: 'absolute', left: 12, zIndex: 20, padding: 4 }}
+            activeOpacity={0.7}
+          >
+            {showPassword ? (
+              <EyeOff color="#64748b" size={22} />
+            ) : (
+              <Eye color="#64748b" size={22} />
+            )}
+          </TouchableOpacity>
+        </View>
+      </View>
+
+      {/* Forgot Password Link */}
+      <TouchableOpacity onPress={() => onNavigate('forgot')} className="mb-8 items-start">
+        <Text style={{ textAlign: 'left', writingDirection: 'rtl' }} className="text-sm font-bold text-indigo-600">
+          نسيت كلمة المرور؟
+        </Text>
+      </TouchableOpacity>
+
+      {/* Login Button */}
+      <TouchableOpacity
+        onPress={handleLogin}
+        className="mb-6 items-center justify-center rounded-2xl bg-indigo-600 py-4 shadow-sm"
+      >
+        <Text style={{ textAlign: 'left' }} className="pb-1 text-base font-bold text-white">
+          تسجيل الدخول
+        </Text>
+      </TouchableOpacity>
+
+      {/* Register Link */}
+      <View className="flex-row justify-center items-center mb-6">
+        <Text style={{ textAlign: 'left', writingDirection: 'rtl' }} className="text-sm font-bold text-slate-500">
+          ليس لديك حساب؟{' '}
+        </Text>
+        <Text onPress={() => onNavigate('register')} className="text-indigo-600 font-bold text-sm">
+          إنشاء حساب جديد
+        </Text>
+      </View>
+    </View>
+  );
+}

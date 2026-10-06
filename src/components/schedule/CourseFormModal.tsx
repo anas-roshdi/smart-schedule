@@ -1,0 +1,372 @@
+import React, { useState } from "react";
+import { Modal, View, Text, TextInput, Pressable, ScrollView, StyleSheet } from "react-native";
+import { X, Plus, Trash2 } from "lucide-react-native";
+import { COLORS } from "./colors";
+import { RegisteredCourse, OfferedSection, Session } from "./data";
+
+export interface CourseFormModalProps {
+  visible: boolean;
+  onClose: () => void;
+  onSave: (course: any) => void;
+  initialData?: RegisteredCourse | OfferedSection;
+  target?: "registered" | "offered";
+}
+
+export function CourseFormModal({
+  visible,
+  onClose,
+  onSave,
+  initialData,
+  target = "registered",
+}: CourseFormModalProps) {
+  return (
+    <Modal visible={visible} transparent animationType="slide">
+      {visible ? (
+        <CourseFormContent
+          key={initialData ? initialData.id : "new"}
+          onClose={onClose}
+          onSave={onSave}
+          initialData={initialData}
+          target={target}
+        />
+      ) : null}
+    </Modal>
+  );
+}
+
+function CourseFormContent({
+  onClose,
+  onSave,
+  initialData,
+  target,
+}: Omit<CourseFormModalProps, "visible"> & { target: "registered" | "offered" }) {
+  const [name, setName] = useState(initialData?.name || "");
+  const [code, setCode] = useState(initialData?.code || "");
+  const [section, setSection] = useState(initialData?.section || "");
+  const [instructor, setInstructor] = useState(initialData?.instructor || "");
+  const [type, setType] = useState<"نظري" | "عملي">(initialData?.type || "نظري");
+  const [mode, setMode] = useState<"حضوري" | "عن بعد">(initialData?.mode || "حضوري");
+  const [sessions, setSessions] = useState<Session[]>(
+    initialData?.sessions && initialData.sessions.length > 0
+      ? initialData.sessions
+      : [{ id: "s-1", day: "الأحد", startTime: "08:00 ص", endTime: "09:30 ص" }]
+  );
+
+  const addSession = () =>
+    setSessions((prev) => [
+      ...prev,
+      { id: Date.now().toString(), day: "الأحد", startTime: "08:00 ص", endTime: "09:30 ص" },
+    ]);
+
+  const removeSession = (id: string) =>
+    setSessions((prev) => prev.filter((s) => s.id !== id));
+
+  const updateSession = (id: string, key: keyof Session, value: string) => {
+    setSessions((prev) =>
+      prev.map((s) => (s.id === id ? { ...s, [key]: value } : s))
+    );
+  };
+
+  const handleSave = () => {
+    if (!name.trim() || !code.trim() || !section.trim()) return;
+
+    if (target === "offered") {
+      const offeredItem: OfferedSection = {
+        id: initialData ? initialData.id : Date.now().toString(),
+        name: name.trim(),
+        code: code.trim(),
+        section: section.trim(),
+        instructor: instructor.trim(),
+        type,
+        mode,
+        sessions,
+        status: (initialData as OfferedSection)?.status ?? "open",
+      };
+      onSave(offeredItem);
+    } else {
+      const registeredItem: RegisteredCourse = {
+        id: initialData ? initialData.id : Date.now().toString(),
+        name: name.trim(),
+        code: code.trim(),
+        section: section.trim(),
+        instructor: instructor.trim(),
+        type,
+        mode,
+        sessions,
+        color: (initialData as RegisteredCourse)?.color || "bg-indigo-500",
+      };
+      onSave(registeredItem);
+    }
+    onClose();
+  };
+
+  const headerTitle = initialData
+    ? (target === "offered" ? "تعديل الشعبة" : "تعديل المقرر")
+    : (target === "offered" ? "إضافة شعبة جديدة" : "إضافة مقرر جديد");
+
+  const saveBtnText = target === "offered"
+    ? (initialData ? "حفظ التعديلات" : "إضافة الشعبة")
+    : (initialData ? "حفظ التعديلات" : "حفظ المقرر");
+
+  return (
+    <View style={s.overlay}>
+      <View style={s.sheet}>
+        {/* Header */}
+        <View className="w-full flex-row justify-between items-center mb-5">
+          <Text className="pb-1 leading-relaxed text-lg font-bold text-slate-900">{headerTitle}</Text>
+          <Pressable onPress={onClose} className="p-2 bg-slate-100 rounded-full">
+            <X size={20} color={COLORS.slate600} />
+          </Pressable>
+        </View>
+
+        <ScrollView className="w-full mb-4" showsVerticalScrollIndicator={false}>
+          <View style={{ width: '100%', gap: 16 }}>
+            {/* Course name */}
+            <View style={{ width: '100%' }}>
+              <Text
+                className="w-full text-sm font-semibold text-slate-700 mb-1.5 pb-0.5"
+                style={{ textAlign: 'left', writingDirection: 'rtl', width: '100%' }}
+              >
+                اسم المقرر
+              </Text>
+              <TextInput
+                value={name}
+                onChangeText={setName}
+                className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-800"
+                style={{
+                  textAlign: "right",
+                  textAlignVertical: "center",
+                  includeFontPadding: false,
+                }}
+                placeholder="مثال: مقدمة في البرمجة"
+                placeholderTextColor={COLORS.slate400}
+              />
+            </View>
+
+            {/* Code + Section */}
+            <View style={{ width: '100%', flexDirection: 'row', gap: 12 }}>
+              <View style={{ flex: 1 }}>
+                <Text
+                  className="w-full text-sm font-semibold text-slate-700 mb-1.5 pb-0.5"
+                  style={{ textAlign: 'left', writingDirection: 'rtl', width: '100%' }}
+                >
+                  رمز المقرر
+                </Text>
+                <TextInput
+                  value={code}
+                  onChangeText={setCode}
+                  className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-800"
+                  style={{
+                    textAlign: "right",
+                    textAlignVertical: "center",
+                    includeFontPadding: false,
+                  }}
+                  placeholder="CS101"
+                  placeholderTextColor={COLORS.slate400}
+                />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text
+                  className="w-full text-sm font-semibold text-slate-700 mb-1.5 pb-0.5"
+                  style={{ textAlign: 'left', writingDirection: 'rtl', width: '100%' }}
+                >
+                  الشعبة
+                </Text>
+                <TextInput
+                  value={section}
+                  onChangeText={setSection}
+                  className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-800"
+                  style={{
+                    textAlign: "right",
+                    textAlignVertical: "center",
+                    includeFontPadding: false,
+                  }}
+                  placeholder="شعبة 5"
+                  placeholderTextColor={COLORS.slate400}
+                />
+              </View>
+            </View>
+
+            {/* Instructor */}
+            <View style={{ width: '100%' }}>
+              <Text
+                className="w-full text-sm font-semibold text-slate-700 mb-1.5 pb-0.5"
+                style={{ textAlign: 'left', writingDirection: 'rtl', width: '100%' }}
+              >
+                دكتور المقرر
+              </Text>
+              <TextInput
+                value={instructor}
+                onChangeText={setInstructor}
+                className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-800"
+                style={{
+                  textAlign: "right",
+                  textAlignVertical: "center",
+                  includeFontPadding: false,
+                }}
+                placeholder="دكتور المقرر (مثال: د. أحمد)"
+                placeholderTextColor={COLORS.slate400}
+              />
+            </View>
+
+            {/* Type + Mode toggles */}
+            <View style={{ width: '100%', flexDirection: 'row', gap: 12 }}>
+              <View style={{ flex: 1 }}>
+                <Text
+                  className="w-full text-sm font-semibold text-slate-700 mb-1.5 pb-0.5"
+                  style={{ textAlign: 'left', writingDirection: 'rtl', width: '100%' }}
+                >
+                  النوع
+                </Text>
+                <View className="flex-row bg-slate-100 rounded-xl p-1">
+                  <Pressable
+                    onPress={() => setType("نظري")}
+                    className={`flex-1 py-2.5 rounded-lg items-center justify-center ${type === "نظري" ? "bg-white shadow-sm" : ""}`}
+                  >
+                    <Text className={`pb-1 leading-relaxed text-xs font-bold text-center ${type === "نظري" ? "text-slate-900" : "text-slate-500"}`}>
+                      نظري
+                    </Text>
+                  </Pressable>
+                  <Pressable
+                    onPress={() => setType("عملي")}
+                    className={`flex-1 py-2.5 rounded-lg items-center justify-center ${type === "عملي" ? "bg-white shadow-sm" : ""}`}
+                  >
+                    <Text className={`pb-1 leading-relaxed text-xs font-bold text-center ${type === "عملي" ? "text-slate-900" : "text-slate-500"}`}>
+                      عملي
+                    </Text>
+                  </Pressable>
+                </View>
+              </View>
+
+              <View style={{ flex: 1 }}>
+                <Text
+                  className="w-full text-sm font-semibold text-slate-700 mb-1.5 pb-0.5"
+                  style={{ textAlign: 'left', writingDirection: 'rtl', width: '100%' }}
+                >
+                  النمط
+                </Text>
+                <View className="flex-row bg-slate-100 rounded-xl p-1">
+                  <Pressable
+                    onPress={() => setMode("حضوري")}
+                    className={`flex-1 py-2.5 rounded-lg items-center justify-center ${mode === "حضوري" ? "bg-white shadow-sm" : ""}`}
+                  >
+                    <Text className={`pb-1 leading-relaxed text-xs font-bold text-center ${mode === "حضوري" ? "text-slate-900" : "text-slate-500"}`}>
+                      حضوري
+                    </Text>
+                  </Pressable>
+                  <Pressable
+                    onPress={() => setMode("عن بعد")}
+                    className={`flex-1 py-2.5 rounded-lg items-center justify-center ${mode === "عن بعد" ? "bg-white shadow-sm" : ""}`}
+                  >
+                    <Text className={`pb-1 leading-relaxed text-xs font-bold text-center ${mode === "عن بعد" ? "text-slate-900" : "text-slate-500"}`}>
+                      عن بعد
+                    </Text>
+                  </Pressable>
+                </View>
+              </View>
+            </View>
+
+            {/* Sessions */}
+            <View style={{ width: '100%', marginTop: 8 }}>
+              <View style={{ width: '100%', flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+                <Text
+                  className="pb-1 leading-relaxed text-sm font-bold text-slate-800"
+                  style={{ textAlign: 'left', writingDirection: 'rtl' }}
+                >
+                  الأوقات
+                </Text>
+                <Pressable onPress={addSession} className="flex-row items-center bg-indigo-50 px-2.5 py-1 rounded-lg gap-1">
+                  <Plus size={14} color={COLORS.indigo600} />
+                  <Text className="text-xs font-bold text-indigo-600 pb-0.5 leading-relaxed">إضافة وقت</Text>
+                </Pressable>
+              </View>
+              <View className="gap-3 w-full items-stretch">
+                {sessions.map((sess, index) => (
+                  <View key={sess.id} className="w-full rounded-2xl border border-slate-200 bg-white p-3 gap-3 items-stretch">
+                    <View className="w-full flex-row justify-between items-center">
+                      <Text className="pb-1 leading-relaxed text-xs font-semibold text-slate-500" style={{ textAlign: "left", writingDirection: 'rtl' }}>
+                        وقت {index + 1}
+                      </Text>
+                      {sessions.length > 1 && (
+                        <Pressable onPress={() => removeSession(sess.id)} hitSlop={8}>
+                          <Trash2 size={16} color="#ef4444" />
+                        </Pressable>
+                      )}
+                    </View>
+                    <TextInput
+                      value={sess.day}
+                      onChangeText={(v) => updateSession(sess.id, "day", v)}
+                      className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-800"
+                      style={{
+                        textAlign: "right",
+                        textAlignVertical: "center",
+                        includeFontPadding: false,
+                      }}
+                      placeholder="اليوم (مثال: الأحد)"
+                      placeholderTextColor={COLORS.slate400}
+                    />
+                    <View className="w-full flex-row gap-2 items-center">
+                      <TextInput
+                        value={sess.startTime}
+                        onChangeText={(v) => updateSession(sess.id, "startTime", v)}
+                        className="w-full flex-1 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-800"
+                        style={{
+                          textAlign: "right",
+                          textAlignVertical: "center",
+                          includeFontPadding: false,
+                        }}
+                        placeholder="08:00 ص"
+                        placeholderTextColor={COLORS.slate400}
+                      />
+                      <TextInput
+                        value={sess.endTime}
+                        onChangeText={(v) => updateSession(sess.id, "endTime", v)}
+                        className="w-full flex-1 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-800"
+                        style={{
+                          textAlign: "right",
+                          textAlignVertical: "center",
+                          includeFontPadding: false,
+                        }}
+                        placeholder="09:30 ص"
+                        placeholderTextColor={COLORS.slate400}
+                      />
+                    </View>
+                  </View>
+                ))}
+              </View>
+            </View>
+          </View>
+        </ScrollView>
+
+        <Pressable
+          onPress={handleSave}
+          className="w-full py-4 rounded-2xl bg-indigo-600 items-center justify-center active:bg-indigo-700"
+        >
+          <Text className="text-base font-bold text-white pb-1 leading-relaxed">
+            {saveBtnText}
+          </Text>
+        </Pressable>
+      </View>
+    </View>
+  );
+}
+
+const s = StyleSheet.create({
+  overlay: {
+    flex: 1,
+    justifyContent: "flex-end",
+    backgroundColor: "rgba(0,0,0,0.4)",
+  },
+  sheet: {
+    backgroundColor: "#fff",
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    maxHeight: "90%",
+    padding: 20,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: -4 },
+    shadowOpacity: 0.08,
+    shadowRadius: 12,
+    elevation: 10,
+  },
+});
