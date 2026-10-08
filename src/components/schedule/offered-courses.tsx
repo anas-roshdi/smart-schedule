@@ -2,7 +2,7 @@ import React, { useMemo, useState } from "react"
 import { TouchableOpacity, Text, TextInput, View, Modal } from "react-native"
 import { CalendarDays, Clock, Hash, MoreVertical, Plus, RefreshCw, Search, User } from "lucide-react-native"
 import { COLORS } from "./colors"
-import { OfferedSection } from "./data"
+import { OfferedSection, RegisteredCourse } from "./data"
 import { useSchedule } from "./ScheduleContext"
 import { CourseFormModal } from "./CourseFormModal"
 
@@ -228,13 +228,38 @@ function OfferedSectionCard({
       return
     }
 
-    addCourse({ ...section, color: "bg-indigo-500" } as any)
+    const registeredCourseItem: RegisteredCourse = {
+      id: section.id,
+      name: section.name,
+      code: section.code,
+      credits: section.credits,
+      section: section.section,
+      color: "bg-indigo-500",
+      type: section.type,
+      mode: section.mode,
+      instructor: section.instructor,
+      sessions: section.sessions,
+    }
+
+    addCourse(registeredCourseItem)
   }
 
   const handleConfirmSwap = () => {
     if (alertModal?.oldCourseId) {
       deleteCourse(alertModal.oldCourseId)
-      addCourse({ ...section, color: "bg-indigo-500" } as any)
+      const registeredCourseItem: RegisteredCourse = {
+        id: section.id,
+        name: section.name,
+        code: section.code,
+        credits: section.credits,
+        section: section.section,
+        color: "bg-indigo-500",
+        type: section.type,
+        mode: section.mode,
+        instructor: section.instructor,
+        sessions: section.sessions,
+      }
+      addCourse(registeredCourseItem)
     }
     setAlertModal(null)
   }
@@ -264,6 +289,11 @@ function OfferedSectionCard({
             </Text>
             <View className="rounded bg-sky-100 px-1.5 py-0.5">
               <Text className="text-[10px] font-bold text-sky-700 leading-relaxed">{section.type}</Text>
+            </View>
+            <View className="rounded bg-indigo-100 px-1.5 py-0.5">
+              <Text className="text-[10px] font-bold text-indigo-700 leading-relaxed">
+                {section.credits} {section.credits === 1 ? "ساعة" : "ساعات"}
+              </Text>
             </View>
           </View>
         </View>

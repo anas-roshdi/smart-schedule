@@ -5,6 +5,54 @@ import type { AuthView } from './auth-container';
 
 type Gender = 'أنثى' | 'ذكر';
 
+export interface RegisterPayload {
+  name: string;
+  email: string;
+  password: string;
+  gender: Gender;
+  studentId?: string;
+  major?: string;
+  academicLevel?: number;
+  phone?: string;
+  dob?: string;
+}
+
+export function buildRegisterPayload(params: {
+  name: string;
+  email: string;
+  password: string;
+  gender: Gender;
+  studentId?: string;
+  major?: string;
+  academicLevel?: string;
+  phone?: string;
+  dob?: string;
+}): RegisterPayload {
+  const payload: RegisterPayload = {
+    name: params.name.trim(),
+    email: params.email.trim(),
+    password: params.password,
+    gender: params.gender,
+  };
+
+  const sId = params.studentId?.trim();
+  if (sId) payload.studentId = sId;
+
+  const maj = params.major?.trim();
+  if (maj) payload.major = maj;
+
+  const lvl = params.academicLevel?.trim();
+  if (lvl) payload.academicLevel = Number(lvl);
+
+  const ph = params.phone?.trim();
+  if (ph) payload.phone = ph;
+
+  const d = params.dob?.trim();
+  if (d) payload.dob = d;
+
+  return payload;
+}
+
 interface RegisterProps {
   onNavigate: (view: AuthView) => void;
   onAuthSuccess: () => void;
@@ -19,6 +67,9 @@ export function Register({ onNavigate, onAuthSuccess }: RegisterProps) {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [emailError, setEmailError] = useState('');
+  const [passwordError, setPasswordError] = useState('');
+  const [confirmPasswordError, setConfirmPasswordError] = useState('');
+  const [academicLevelError, setAcademicLevelError] = useState('');
 
   // Optional fields
   const [phone, setPhone] = useState('');
@@ -39,10 +90,55 @@ export function Register({ onNavigate, onAuthSuccess }: RegisterProps) {
   };
 
   const handleRegister = () => {
-    if (validateEmail(email)) {
-      console.log('Register attempt', { name, email, password });
-      setShowSuccessModal(true);
+    let hasError = false;
+
+    if (!validateEmail(email)) {
+      if (email.trim() === '') {
+        setEmailError('البريد الإلكتروني مطلوب');
+      }
+      hasError = true;
     }
+
+    if (password.length < 8) {
+      setPasswordError('كلمة المرور يجب ألا تقل عن 8 أحرف');
+      hasError = true;
+    }
+
+    if (password !== confirmPassword) {
+      setConfirmPasswordError('كلمتا المرور غير متطابقتين');
+      hasError = true;
+    }
+
+    const trimmedLevel = academicLevel.trim();
+    if (trimmedLevel !== '') {
+      const levelNum = Number(trimmedLevel);
+      if (!Number.isInteger(levelNum) || levelNum < 1 || levelNum > 12) {
+        setAcademicLevelError('المستوى الدراسي يجب أن يكون رقماً بين 1 و 12');
+        hasError = true;
+      }
+    }
+
+    if (hasError) {
+      return;
+    }
+
+    const payload = buildRegisterPayload({
+      name,
+      email,
+      password,
+      gender,
+      studentId,
+      major,
+      academicLevel,
+      phone,
+      dob,
+    });
+
+    console.log('Register attempt', {
+      ...payload,
+      password: '***',
+    });
+    setShowSuccessModal(true);
   };
 
   return (
@@ -99,13 +195,16 @@ export function Register({ onNavigate, onAuthSuccess }: RegisterProps) {
         {/* The container explicitly disables RTL mirroring for layout positioning */}
         <View style={{ direction: 'ltr', position: 'relative', justifyContent: 'center' }}>
           <TextInput
-            className="rounded-xl border border-slate-200 bg-slate-50 p-4 text-base text-slate-900"
+            className={`rounded-xl border ${passwordError ? 'border-red-500' : 'border-slate-200'} bg-slate-50 p-4 text-base text-slate-900`}
             style={{ paddingLeft: 48, paddingRight: 16, textAlign: 'right', writingDirection: 'rtl', textAlignVertical: 'center', includeFontPadding: false }}
             placeholder="أدخل كلمة المرور"
             placeholderTextColor="#64748b"
             secureTextEntry={!showPassword}
             value={password}
-            onChangeText={setPassword}
+            onChangeText={(val) => {
+              setPassword(val);
+              if (passwordError) setPasswordError('');
+            }}
           />
           {/* Absolute Left button - explicit zIndex and pixel left position */}
           <TouchableOpacity
@@ -120,6 +219,11 @@ export function Register({ onNavigate, onAuthSuccess }: RegisterProps) {
             )}
           </TouchableOpacity>
         </View>
+        {!!passwordError && (
+          <Text style={{ textAlign: 'left', writingDirection: 'rtl', width: '100%' }} className="mt-1 text-xs text-red-500">
+            {passwordError}
+          </Text>
+        )}
       </View>
 
       <View className="mb-8">
@@ -129,13 +233,16 @@ export function Register({ onNavigate, onAuthSuccess }: RegisterProps) {
         {/* The container explicitly disables RTL mirroring for layout positioning */}
         <View style={{ direction: 'ltr', position: 'relative', justifyContent: 'center' }}>
           <TextInput
-            className="rounded-xl border border-slate-200 bg-slate-50 p-4 text-base text-slate-900"
+            className={`rounded-xl border ${confirmPasswordError ? 'border-red-500' : 'border-slate-200'} bg-slate-50 p-4 text-base text-slate-900`}
             style={{ paddingLeft: 48, paddingRight: 16, textAlign: 'right', writingDirection: 'rtl', textAlignVertical: 'center', includeFontPadding: false }}
             placeholder="أعد إدخال كلمة المرور"
             placeholderTextColor="#64748b"
             secureTextEntry={!showConfirmPassword}
             value={confirmPassword}
-            onChangeText={setConfirmPassword}
+            onChangeText={(val) => {
+              setConfirmPassword(val);
+              if (confirmPasswordError) setConfirmPasswordError('');
+            }}
           />
           {/* Absolute Left button - explicit zIndex and pixel left position */}
           <TouchableOpacity
@@ -150,6 +257,11 @@ export function Register({ onNavigate, onAuthSuccess }: RegisterProps) {
             )}
           </TouchableOpacity>
         </View>
+        {!!confirmPasswordError && (
+          <Text style={{ textAlign: 'left', writingDirection: 'rtl', width: '100%' }} className="mt-1 text-xs text-red-500">
+            {confirmPasswordError}
+          </Text>
+        )}
       </View>
 
 
@@ -232,14 +344,22 @@ export function Register({ onNavigate, onAuthSuccess }: RegisterProps) {
           المستوى الدراسي
         </Text>
         <TextInput
-          className="rounded-xl border border-slate-200 bg-slate-50 p-4 text-base text-slate-900"
+          className={`rounded-xl border ${academicLevelError ? 'border-red-500' : 'border-slate-200'} bg-slate-50 p-4 text-base text-slate-900`}
           style={{ textAlign: 'right', writingDirection: 'rtl', textAlignVertical: 'center', includeFontPadding: false }}
           placeholder="مثال: 3"
           placeholderTextColor="#64748b"
           keyboardType="numeric"
           value={academicLevel}
-          onChangeText={setAcademicLevel}
+          onChangeText={(val) => {
+            setAcademicLevel(val);
+            if (academicLevelError) setAcademicLevelError('');
+          }}
         />
+        {!!academicLevelError && (
+          <Text style={{ textAlign: 'left', writingDirection: 'rtl', width: '100%' }} className="mt-1 text-xs text-red-500">
+            {academicLevelError}
+          </Text>
+        )}
       </View>
 
       <View className="mb-8">

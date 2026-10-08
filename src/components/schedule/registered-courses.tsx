@@ -7,11 +7,13 @@ import { CourseFormModal } from "./CourseFormModal"
 import { useState } from "react"
 
 export function RegisteredCourses() {
-  const { registeredCourses, deleteCourse, updateCourse, addCourse } = useSchedule()
+  const { registeredCourses, deleteCourse, updateCourse, addCourse, maxCredits, totalCredits } = useSchedule()
   const [formVisible, setFormVisible] = useState(false)
   const [editingCourse, setEditingCourse] = useState<RegisteredCourse | undefined>()
   const [menuFor, setMenuFor] = useState<RegisteredCourse | null>(null)
   const [deleteConfirmFor, setDeleteConfirmFor] = useState<RegisteredCourse | null>(null)
+
+  const isOverLimit = totalCredits > maxCredits
 
   return (
     <View className="gap-4">
@@ -31,10 +33,25 @@ export function RegisteredCourses() {
 
       <View className="flex-row items-center justify-between px-1">
         <Text className="text-sm font-bold text-slate-800">المقررات المسجلة</Text>
-        <View className="rounded-full bg-indigo-50 px-2.5 py-0.5">
-          <Text className="text-xs font-semibold text-indigo-600">
-            {registeredCourses.length} مقررات
-          </Text>
+        <View className="flex-row items-center gap-2">
+          <View
+            className={`rounded-full px-2.5 py-0.5 ${
+              isOverLimit ? "bg-rose-50 border border-rose-200" : "bg-indigo-50"
+            }`}
+          >
+            <Text
+              className={`text-xs font-semibold ${
+                isOverLimit ? "text-rose-600" : "text-indigo-600"
+              }`}
+            >
+              {totalCredits} / {maxCredits} ساعة
+            </Text>
+          </View>
+          <View className="rounded-full bg-indigo-50 px-2.5 py-0.5">
+            <Text className="text-xs font-semibold text-indigo-600">
+              {registeredCourses.length} مقررات
+            </Text>
+          </View>
         </View>
       </View>
 
@@ -70,6 +87,11 @@ export function RegisteredCourses() {
                     </View>
                     <View className="rounded bg-sky-100 px-1.5 py-0.5">
                       <Text className="text-[10px] font-bold text-sky-700 leading-relaxed">{course.type}</Text>
+                    </View>
+                    <View className="rounded bg-indigo-100 px-1.5 py-0.5">
+                      <Text className="text-[10px] font-bold text-indigo-700 leading-relaxed">
+                        {course.credits} {course.credits === 1 ? "ساعة" : "ساعات"}
+                      </Text>
                     </View>
                   </View>
                 </View>

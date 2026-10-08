@@ -2,12 +2,14 @@ import React, { useState } from "react";
 import { View, Text, TouchableOpacity, Switch, TextInput, Alert } from "react-native";
 import { Minus, Plus, Trash2 } from "lucide-react-native";
 import { COLORS } from "./colors";
+import { useSchedule } from "./ScheduleContext";
 
 type PreferredTime = "صباحي" | "مسائي" | "مرن";
 type ScheduleDensity = "مضغوط" | "مريح";
 type DayOff = "الأحد" | "الإثنين" | "الثلاثاء" | "الأربعاء" | "الخميس";
 
 export function Preferences() {
+  const { maxCredits, setMaxCredits } = useSchedule();
   const [preferredTime, setPreferredTime] = useState<PreferredTime>("صباحي");
   const [daysOff, setDaysOff] = useState<DayOff[]>([]);
   const [density, setDensity] = useState<ScheduleDensity>("مريح");
@@ -42,6 +44,7 @@ export function Preferences() {
       daysOff,
       density,
       maxBreakHours: noMaxBreak ? null : maxBreakHours,
+      maxCredits,
       hasBlockedTime,
       blockedTimes,
     });
@@ -187,7 +190,38 @@ export function Preferences() {
         </View>
       </View>
 
-      {/* Section 5: Blocked Times */}
+      {/* Section 5: Max Credits */}
+      <View className="mb-6 w-full">
+        <Text
+          className="text-sm font-bold text-slate-800 mb-3"
+          style={{ textAlign: "left", writingDirection: "rtl" }}
+        >
+          الحد الأقصى للساعات المعتمدة
+        </Text>
+        <View className="flex-row items-center justify-between w-full">
+          <View className="flex-1 flex-row items-center justify-between bg-white border border-indigo-200 rounded-2xl p-2">
+            <TouchableOpacity
+              disabled={maxCredits <= 1}
+              onPress={() => setMaxCredits(Math.max(1, maxCredits - 1))}
+              className="p-2 bg-slate-50 rounded-xl"
+            >
+              <Minus size={20} color={maxCredits <= 1 ? COLORS.slate300 : COLORS.slate600} />
+            </TouchableOpacity>
+            <Text className="text-sm font-bold text-slate-800 pb-1 leading-relaxed">
+              {maxCredits} {maxCredits === 1 ? "ساعة" : "ساعات"}
+            </Text>
+            <TouchableOpacity
+              disabled={maxCredits >= 30}
+              onPress={() => setMaxCredits(Math.min(30, maxCredits + 1))}
+              className="p-2 bg-slate-50 rounded-xl"
+            >
+              <Plus size={20} color={maxCredits >= 30 ? COLORS.slate300 : COLORS.slate600} />
+            </TouchableOpacity>
+          </View>
+        </View>
+      </View>
+
+      {/* Section 6: Blocked Times */}
       <View className="mb-8 w-full bg-white p-4 rounded-2xl border border-slate-200">
         <View className="flex-row justify-between items-center mb-1">
           <View className="flex-row items-center gap-2">

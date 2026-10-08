@@ -9,6 +9,7 @@ export type RegisteredCourse = {
   id: string
   name: string
   code: string
+  credits: number
   section: string
   color: string
   type: "نظري" | "عملي"
@@ -21,6 +22,7 @@ export type OfferedSection = {
   id: string
   name: string
   code: string
+  credits: number
   section: string
   status: "open" | "closed"
   type: "نظري" | "عملي"
@@ -34,6 +36,7 @@ export const registeredCourses: RegisteredCourse[] = [
     id: "1",
     name: "مقدمة في البرمجة",
     code: "CS101",
+    credits: 3,
     section: "شعبة 5",
     color: "bg-sky-500",
     type: "نظري",
@@ -48,6 +51,7 @@ export const registeredCourses: RegisteredCourse[] = [
     id: "2",
     name: "مقدمة في البرمجة",
     code: "CS101",
+    credits: 3,
     section: "شعبة 5",
     color: "bg-sky-500",
     type: "عملي",
@@ -61,6 +65,7 @@ export const registeredCourses: RegisteredCourse[] = [
     id: "3",
     name: "التفاضل والتكامل (1)",
     code: "MATH105",
+    credits: 4,
     section: "شعبة 1",
     color: "bg-emerald-500",
     type: "نظري",
@@ -79,6 +84,7 @@ export const offeredSections: OfferedSection[] = [
     id: "1",
     name: "مقدمة في البرمجة",
     code: "CS101",
+    credits: 3,
     section: "شعبة 5",
     status: "open",
     type: "نظري",
@@ -93,6 +99,7 @@ export const offeredSections: OfferedSection[] = [
     id: "2",
     name: "مقدمة في البرمجة",
     code: "CS101",
+    credits: 3,
     section: "شعبة 5",
     status: "open",
     type: "عملي",
@@ -106,6 +113,7 @@ export const offeredSections: OfferedSection[] = [
     id: "3",
     name: "التصميم المنطقي",
     code: "CS210",
+    credits: 3,
     section: "شعبة 2",
     status: "closed",
     type: "نظري",

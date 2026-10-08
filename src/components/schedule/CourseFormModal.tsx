@@ -1,8 +1,9 @@
 import React, { useState } from "react";
 import { Modal, View, Text, TextInput, Pressable, ScrollView, StyleSheet } from "react-native";
-import { X, Plus, Trash2 } from "lucide-react-native";
+import { X, Plus, Minus, Trash2 } from "lucide-react-native";
 import { COLORS } from "./colors";
 import { RegisteredCourse, OfferedSection, Session } from "./data";
+import { useSchedule } from "./ScheduleContext";
 
 export interface CourseFormModalProps {
   visible: boolean;
@@ -40,8 +41,10 @@ function CourseFormContent({
   initialData,
   target,
 }: Omit<CourseFormModalProps, "visible"> & { target: "registered" | "offered" }) {
+  const { registeredCourses, offeredSections } = useSchedule();
   const [name, setName] = useState(initialData?.name || "");
   const [code, setCode] = useState(initialData?.code || "");
+  const [credits, setCredits] = useState<number>(initialData?.credits ?? 3);
   const [section, setSection] = useState(initialData?.section || "");
   const [instructor, setInstructor] = useState(initialData?.instructor || "");
   const [type, setType] = useState<"نظري" | "عملي">(initialData?.type || "نظري");
@@ -51,6 +54,19 @@ function CourseFormContent({
       ? initialData.sessions
       : [{ id: "s-1", day: "الأحد", startTime: "08:00 ص", endTime: "09:30 ص" }]
   );
+
+  const handleCodeChange = (text: string) => {
+    setCode(text);
+    const trimmed = text.trim().toLowerCase();
+    if (trimmed) {
+      const match = [...registeredCourses, ...offeredSections].find(
+        (c) => c.code.trim().toLowerCase() === trimmed && typeof c.credits === "number"
+      );
+      if (match) {
+        setCredits(match.credits);
+      }
+    }
+  };
 
   const addSession = () =>
     setSessions((prev) => [
@@ -75,6 +91,7 @@ function CourseFormContent({
         id: initialData ? initialData.id : Date.now().toString(),
         name: name.trim(),
         code: code.trim(),
+        credits,
         section: section.trim(),
         instructor: instructor.trim(),
         type,
@@ -88,6 +105,7 @@ function CourseFormContent({
         id: initialData ? initialData.id : Date.now().toString(),
         name: name.trim(),
         code: code.trim(),
+        credits,
         section: section.trim(),
         instructor: instructor.trim(),
         type,
@@ -143,48 +161,77 @@ function CourseFormContent({
               />
             </View>
 
-            {/* Code + Section */}
-            <View style={{ width: '100%', flexDirection: 'row', gap: 12 }}>
-              <View style={{ flex: 1 }}>
-                <Text
-                  className="w-full text-sm font-semibold text-slate-700 mb-1.5 pb-0.5"
-                  style={{ textAlign: 'left', writingDirection: 'rtl', width: '100%' }}
+            {/* Course Code */}
+            <View style={{ width: '100%' }}>
+              <Text
+                className="w-full text-sm font-semibold text-slate-700 mb-1.5 pb-0.5"
+                style={{ textAlign: 'left', writingDirection: 'rtl', width: '100%' }}
+              >
+                رمز المقرر
+              </Text>
+              <TextInput
+                value={code}
+                onChangeText={handleCodeChange}
+                className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-800"
+                style={{
+                  textAlign: "right",
+                  textAlignVertical: "center",
+                  includeFontPadding: false,
+                }}
+                placeholder="CS101"
+                placeholderTextColor={COLORS.slate400}
+              />
+            </View>
+
+            {/* Credits Counter */}
+            <View style={{ width: '100%' }}>
+              <Text
+                className="w-full text-sm font-semibold text-slate-700 mb-1.5 pb-0.5"
+                style={{ textAlign: 'left', writingDirection: 'rtl', width: '100%' }}
+              >
+                الساعات المعتمدة
+              </Text>
+              <View className="w-full flex-row items-center justify-between bg-white border border-indigo-200 rounded-2xl p-2">
+                <Pressable
+                  disabled={credits <= 1}
+                  onPress={() => setCredits((prev) => Math.max(1, prev - 1))}
+                  className="p-2 bg-slate-50 rounded-xl"
                 >
-                  رمز المقرر
+                  <Minus size={20} color={credits <= 1 ? COLORS.slate300 : COLORS.slate600} />
+                </Pressable>
+                <Text className="text-sm font-bold text-slate-800 pb-1 leading-relaxed">
+                  {credits} {credits === 1 ? "ساعة" : "ساعات"}
                 </Text>
-                <TextInput
-                  value={code}
-                  onChangeText={setCode}
-                  className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-800"
-                  style={{
-                    textAlign: "right",
-                    textAlignVertical: "center",
-                    includeFontPadding: false,
-                  }}
-                  placeholder="CS101"
-                  placeholderTextColor={COLORS.slate400}
-                />
-              </View>
-              <View style={{ flex: 1 }}>
-                <Text
-                  className="w-full text-sm font-semibold text-slate-700 mb-1.5 pb-0.5"
-                  style={{ textAlign: 'left', writingDirection: 'rtl', width: '100%' }}
+                <Pressable
+                  disabled={credits >= 6}
+                  onPress={() => setCredits((prev) => Math.min(6, prev + 1))}
+                  className="p-2 bg-slate-50 rounded-xl"
                 >
-                  الشعبة
-                </Text>
-                <TextInput
-                  value={section}
-                  onChangeText={setSection}
-                  className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-800"
-                  style={{
-                    textAlign: "right",
-                    textAlignVertical: "center",
-                    includeFontPadding: false,
-                  }}
-                  placeholder="شعبة 5"
-                  placeholderTextColor={COLORS.slate400}
-                />
+                  <Plus size={20} color={credits >= 6 ? COLORS.slate300 : COLORS.slate600} />
+                </Pressable>
               </View>
+            </View>
+
+            {/* Section */}
+            <View style={{ width: '100%' }}>
+              <Text
+                className="w-full text-sm font-semibold text-slate-700 mb-1.5 pb-0.5"
+                style={{ textAlign: 'left', writingDirection: 'rtl', width: '100%' }}
+              >
+                الشعبة
+              </Text>
+              <TextInput
+                value={section}
+                onChangeText={setSection}
+                className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-800"
+                style={{
+                  textAlign: "right",
+                  textAlignVertical: "center",
+                  includeFontPadding: false,
+                }}
+                placeholder="شعبة 5"
+                placeholderTextColor={COLORS.slate400}
+              />
             </View>
 
             {/* Instructor */}

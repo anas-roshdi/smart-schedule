@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, ReactNode } from "react";
+import React, { createContext, useContext, useState, useMemo, ReactNode } from "react";
 import {
   RegisteredCourse,
   registeredCourses as initialRegisteredCourses,
@@ -19,6 +19,9 @@ interface ScheduleContextType {
   toggleOfferedSectionStatus: (id: string) => void;
   checkConflict: (sessions: Session[]) => boolean;
   getCourseByCodeAndType: (code: string, type: string) => RegisteredCourse | undefined;
+  maxCredits: number;
+  setMaxCredits: (n: number) => void;
+  totalCredits: number;
 }
 
 const ScheduleContext = createContext<ScheduleContextType | undefined>(undefined);
@@ -26,6 +29,20 @@ const ScheduleContext = createContext<ScheduleContextType | undefined>(undefined
 export function ScheduleProvider({ children }: { children: ReactNode }) {
   const [courses, setCourses] = useState<RegisteredCourse[]>(initialRegisteredCourses);
   const [offered, setOffered] = useState<OfferedSection[]>(initialOfferedSections);
+  const [maxCredits, setMaxCredits] = useState<number>(18);
+
+  const totalCredits = useMemo(() => {
+    const seenCodes = new Set<string>();
+    let total = 0;
+    for (const c of courses) {
+      const codeKey = c.code.trim().toUpperCase();
+      if (!seenCodes.has(codeKey)) {
+        seenCodes.add(codeKey);
+        total += c.credits || 0;
+      }
+    }
+    return total;
+  }, [courses]);
 
   const addCourse = (course: RegisteredCourse) => {
     setCourses((prev) => [...prev, course]);
@@ -112,6 +129,9 @@ export function ScheduleProvider({ children }: { children: ReactNode }) {
         toggleOfferedSectionStatus,
         checkConflict,
         getCourseByCodeAndType,
+        maxCredits,
+        setMaxCredits,
+        totalCredits,
       }}
     >
       {children}
