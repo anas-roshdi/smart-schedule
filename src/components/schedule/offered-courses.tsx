@@ -239,6 +239,7 @@ function OfferedSectionCard({
       mode: section.mode,
       instructor: section.instructor,
       sessions: section.sessions,
+      locked: false,
     }
 
     addCourse(registeredCourseItem)
@@ -246,6 +247,7 @@ function OfferedSectionCard({
 
   const handleConfirmSwap = () => {
     if (alertModal?.oldCourseId) {
+      const oldCourse = registeredCourses.find((c) => c.id === alertModal.oldCourseId)
       deleteCourse(alertModal.oldCourseId)
       const registeredCourseItem: RegisteredCourse = {
         id: section.id,
@@ -258,6 +260,7 @@ function OfferedSectionCard({
         mode: section.mode,
         instructor: section.instructor,
         sessions: section.sessions,
+        locked: oldCourse ? oldCourse.locked : false,
       }
       addCourse(registeredCourseItem)
     }

@@ -1,4 +1,4 @@
-import { CalendarDays, Clock, Hash, MoreVertical, Plus, User } from "lucide-react-native"
+import { CalendarDays, Clock, Hash, Lock, MoreVertical, Plus, Unlock, User } from "lucide-react-native"
 import { Text, TouchableOpacity, View, Modal } from "react-native"
 import { COLORS } from "./colors"
 import { RegisteredCourse } from "./data"
@@ -7,7 +7,7 @@ import { CourseFormModal } from "./CourseFormModal"
 import { useState } from "react"
 
 export function RegisteredCourses() {
-  const { registeredCourses, deleteCourse, updateCourse, addCourse, maxCredits, totalCredits } = useSchedule()
+  const { registeredCourses, deleteCourse, updateCourse, addCourse, maxCredits, totalCredits, toggleCourseLock } = useSchedule()
   const [formVisible, setFormVisible] = useState(false)
   const [editingCourse, setEditingCourse] = useState<RegisteredCourse | undefined>()
   const [menuFor, setMenuFor] = useState<RegisteredCourse | null>(null)
@@ -55,6 +55,13 @@ export function RegisteredCourses() {
         </View>
       </View>
 
+      <Text
+        className="px-1 text-xs text-slate-400 -mt-2"
+        style={{ textAlign: 'left', writingDirection: 'rtl' }}
+      >
+        ثبّت المقررات الأساسية لتبقى في الجداول المقترحة
+      </Text>
+
       <View className="gap-3">
         {registeredCourses.map((course) => (
           <View
@@ -93,11 +100,30 @@ export function RegisteredCourses() {
                         {course.credits} {course.credits === 1 ? "ساعة" : "ساعات"}
                       </Text>
                     </View>
+                    {course.locked && (
+                      <View className="rounded bg-amber-100 px-1.5 py-0.5">
+                        <Text className="text-[10px] font-bold text-amber-800 leading-relaxed">أساسي</Text>
+                      </View>
+                    )}
                   </View>
                 </View>
-                <TouchableOpacity accessibilityRole="button" onPress={() => setMenuFor(course)} className="p-1">
-                  <MoreVertical size={20} color={COLORS.slate400} />
-                </TouchableOpacity>
+                <View className="flex-row items-center gap-1">
+                  <TouchableOpacity
+                    accessibilityRole="button"
+                    hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                    onPress={() => toggleCourseLock(course.code)}
+                    className="p-1.5 rounded-lg active:bg-slate-100"
+                  >
+                    {course.locked ? (
+                      <Lock size={18} color={COLORS.indigo600} />
+                    ) : (
+                      <Unlock size={18} color={COLORS.slate400} />
+                    )}
+                  </TouchableOpacity>
+                  <TouchableOpacity accessibilityRole="button" onPress={() => setMenuFor(course)} className="p-1">
+                    <MoreVertical size={20} color={COLORS.slate400} />
+                  </TouchableOpacity>
+                </View>
               </View>
 
               <View className="mt-3 gap-2 border-t border-slate-100 pt-3">
@@ -152,7 +178,11 @@ export function RegisteredCourses() {
         <View className="flex-1 justify-center items-center bg-black/40 px-5">
           <View className="bg-white w-full rounded-2xl p-6 items-center">
             <Text className="text-lg font-bold text-slate-800 mb-2">تأكيد الحذف</Text>
-            <Text className="text-sm text-slate-500 mb-6 text-center">هل أنت متأكد من حذف هذا المقرر؟</Text>
+            <Text className="text-sm text-slate-500 mb-6 text-center leading-relaxed">
+              {deleteConfirmFor?.locked
+                ? "هذا المقرر مثبّت كمقرر أساسي. هل تريد حذفه فعلاً؟"
+                : "هل أنت متأكد من حذف هذا المقرر؟"}
+            </Text>
             <View className="flex-row gap-3 w-full">
               <TouchableOpacity onPress={() => setDeleteConfirmFor(null)} className="flex-1 py-3 rounded-xl bg-slate-100 items-center">
                 <Text className="text-sm font-bold text-slate-700">إلغاء</Text>

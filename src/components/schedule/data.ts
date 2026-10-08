@@ -16,6 +16,7 @@ export type RegisteredCourse = {
   mode: "حضوري" | "عن بعد"
   instructor: string
   sessions: Session[]
+  locked: boolean
 }
 
 export type OfferedSection = {
@@ -42,6 +43,7 @@ export const registeredCourses: RegisteredCourse[] = [
     type: "نظري",
     mode: "حضوري",
     instructor: "د. أحمد الشهري",
+    locked: false,
     sessions: [
       { id: "s1", day: "الأحد", startTime: "08:00 ص", endTime: "09:30 ص" },
       { id: "s2", day: "الثلاثاء", startTime: "08:00 ص", endTime: "09:30 ص" },
@@ -57,6 +59,7 @@ export const registeredCourses: RegisteredCourse[] = [
     type: "عملي",
     mode: "حضوري",
     instructor: "أ. سعد اليوسف",
+    locked: false,
     sessions: [
       { id: "s3", day: "الخميس", startTime: "10:00 ص", endTime: "11:50 ص" },
     ],
@@ -71,6 +74,7 @@ export const registeredCourses: RegisteredCourse[] = [
     type: "نظري",
     mode: "حضوري",
     instructor: "د. خالد السعيد",
+    locked: false,
     sessions: [
       { id: "s4", day: "الأحد", startTime: "12:00 م", endTime: "12:50 م" },
       { id: "s5", day: "الثلاثاء", startTime: "12:00 م", endTime: "12:50 م" },

@@ -112,6 +112,7 @@ function CourseFormContent({
         mode,
         sessions,
         color: (initialData as RegisteredCourse)?.color || "bg-indigo-500",
+        locked: (initialData as RegisteredCourse)?.locked ?? false,
       };
       onSave(registeredItem);
     }

@@ -22,6 +22,8 @@ interface ScheduleContextType {
   maxCredits: number;
   setMaxCredits: (n: number) => void;
   totalCredits: number;
+  toggleCourseLock: (code: string) => void;
+  isCourseLocked: (code: string) => boolean;
 }
 
 const ScheduleContext = createContext<ScheduleContextType | undefined>(undefined);
@@ -115,6 +117,18 @@ export function ScheduleProvider({ children }: { children: ReactNode }) {
     return courses.find((c) => c.code === code && c.type === type);
   };
 
+  const toggleCourseLock = (code: string) => {
+    setCourses((prev) => {
+      const hasAnyUnlocked = prev.some((c) => c.code === code && !c.locked);
+      const newLocked = hasAnyUnlocked;
+      return prev.map((c) => (c.code === code ? { ...c, locked: newLocked } : c));
+    });
+  };
+
+  const isCourseLocked = (code: string) => {
+    return courses.some((c) => c.code === code && c.locked);
+  };
+
   return (
     <ScheduleContext.Provider
       value={{
@@ -132,6 +146,8 @@ export function ScheduleProvider({ children }: { children: ReactNode }) {
         maxCredits,
         setMaxCredits,
         totalCredits,
+        toggleCourseLock,
+        isCourseLocked,
       }}
     >
       {children}
