@@ -1,5 +1,5 @@
 import { CheckCircle2, Eye, EyeOff } from 'lucide-react-native';
-import React, { useState } from 'react';
+import { useState } from 'react';
 import {
   ActivityIndicator,
   Modal,
@@ -9,9 +9,9 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import type { AuthView } from './auth-container';
 import { ApiError } from '../../lib/api';
 import { register } from '../../lib/auth';
+import type { AuthView } from './auth-container';
 
 type Gender = 'أنثى' | 'ذكر';
 
@@ -114,8 +114,9 @@ export function Register({ onNavigate, onAuthSuccess }: RegisterProps) {
   };
 
   const validateEmail = (val: string) => {
-    const isValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(val);
-    if (!isValid && val.trim() !== '') {
+    const v = val.trim();
+    const isValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v);
+    if (!isValid && v !== '') {
       setEmailError('صيغة البريد الإلكتروني غير صحيحة');
     } else {
       setEmailError('');
@@ -233,7 +234,7 @@ export function Register({ onNavigate, onAuthSuccess }: RegisterProps) {
   };
 
   return (
-    <ScrollView showsVerticalScrollIndicator={false} className="flex-1 px-6 pt-12" contentContainerStyle={{ paddingBottom: 100 }}>
+    <ScrollView keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false} className="flex-1 px-6 pt-12" contentContainerStyle={{ paddingBottom: 100 }}>
       <Text style={{ textAlign: 'left', writingDirection: 'rtl', lineHeight: 32 }} className="mt-8 mb-8 pb-1 text-3xl font-extrabold text-slate-900 text-center">
         إنشاء حساب جديد
       </Text>

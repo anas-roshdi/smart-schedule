@@ -1,9 +1,9 @@
 import { CalendarDays, Eye, EyeOff } from 'lucide-react-native';
 import { useState } from 'react';
 import { ActivityIndicator, Text, TextInput, TouchableOpacity, View } from 'react-native';
-import type { AuthView } from './auth-container';
 import { ApiError } from '../../lib/api';
 import { login } from '../../lib/auth';
+import type { AuthView } from './auth-container';
 
 interface LoginProps {
   onNavigate: (view: AuthView) => void;
@@ -19,8 +19,9 @@ export function Login({ onNavigate, onAuthSuccess }: LoginProps) {
   const [isLoading, setIsLoading] = useState(false);
 
   const validateEmail = (val: string) => {
-    const isValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(val);
-    if (!isValid && val.trim() !== '') {
+    const v = val.trim();
+    const isValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v);
+    if (!isValid && v !== '') {
       setEmailError('صيغة البريد الإلكتروني غير صحيحة');
     } else {
       setEmailError('');

@@ -71,10 +71,12 @@ export async function request<T>(path: string, options?: RequestOptions): Promis
 
     if (response.ok) {
       const text = await response.text();
-      if (!text) {
-        return undefined as T;
+      if (!text) return undefined as T;
+      try {
+        return JSON.parse(text) as T;
+      } catch {
+        throw new ApiError({ status: response.status, message: 'استجابة غير صالحة من الخادم' });
       }
-      return JSON.parse(text) as T;
     }
 
     let errorData: any = null;
@@ -107,10 +109,12 @@ export async function request<T>(path: string, options?: RequestOptions): Promis
     if (error instanceof ApiError) {
       throw error;
     }
-
+    const isTimeout = error instanceof Error && error.name === 'AbortError';
     throw new ApiError({
       status: 0,
-      message: 'تعذر الاتصال بالخادم، تأكد من اتصالك بالشبكة',
+      message: isTimeout
+        ? 'انتهت مهلة الاتصال بالخادم، حاول مرة أخرى'
+        : 'تعذر الاتصال بالخادم، تأكد من اتصالك بالشبكة',
       details: error,
     });
   } finally {

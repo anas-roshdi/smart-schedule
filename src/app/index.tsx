@@ -1,6 +1,6 @@
+import { router } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, View } from 'react-native';
-import { router } from 'expo-router';
 import { AuthContainer } from '../components/auth/auth-container';
 import { ApiError, setUnauthorizedHandler } from '../lib/api';
 import { fetchMe } from '../lib/auth';
@@ -10,6 +10,8 @@ export default function Index() {
   const [isChecking, setIsChecking] = useState(true);
 
   useEffect(() => {
+    let cancelled = false;
+
     setUnauthorizedHandler(() => {
       router.replace('/');
     });
@@ -18,21 +20,25 @@ export default function Index() {
       try {
         const token = await getToken();
         if (!token) {
-          setIsChecking(false);
+          if (!cancelled) setIsChecking(false);
           return;
         }
 
         await fetchMe();
-        router.replace('/(main)/schedule-planner');
+        if (!cancelled) router.replace('/(main)/schedule-planner');
       } catch (error) {
         if (error instanceof ApiError && error.status === 401) {
           await clearToken();
         }
-        setIsChecking(false);
+        if (!cancelled) setIsChecking(false);
       }
     }
 
     checkAuth();
+
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   const handleAuthSuccess = () => {
