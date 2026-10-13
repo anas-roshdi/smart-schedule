@@ -1,4 +1,5 @@
 import { router } from "expo-router"
+import { logout } from "../../lib/auth"
 import { StatusBar } from "expo-status-bar"
 import {
   BookMarked,
@@ -97,8 +98,9 @@ export function SchedulePlanner() {
 
                 <TouchableOpacity
                   className="flex-row items-center px-4 py-3"
-                  onPress={() => {
+                  onPress={async () => {
                     setIsProfileMenuVisible(false)
+                    await logout()
                     router.replace('/')
                   }}
                 >

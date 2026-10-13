@@ -1,7 +1,9 @@
 import { CalendarDays, Eye, EyeOff } from 'lucide-react-native';
 import { useState } from 'react';
-import { Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import type { AuthView } from './auth-container';
+import { ApiError } from '../../lib/api';
+import { login } from '../../lib/auth';
 
 interface LoginProps {
   onNavigate: (view: AuthView) => void;
@@ -13,6 +15,8 @@ export function Login({ onNavigate, onAuthSuccess }: LoginProps) {
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [emailError, setEmailError] = useState('');
+  const [generalError, setGeneralError] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
 
   const validateEmail = (val: string) => {
     const isValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(val);
@@ -24,11 +28,26 @@ export function Login({ onNavigate, onAuthSuccess }: LoginProps) {
     return isValid;
   };
 
-  const handleLogin = () => {
+  const handleLogin = async () => {
+    setGeneralError('');
     if (validateEmail(email)) {
-      // Proceed with login logic
-      console.log('Login attempt', { email, password });
-      onAuthSuccess();
+      if (!password) {
+        setGeneralError('يرجى إدخال كلمة المرور');
+        return;
+      }
+      setIsLoading(true);
+      try {
+        await login(email.trim(), password);
+        onAuthSuccess();
+      } catch (error) {
+        if (error instanceof ApiError) {
+          setGeneralError(error.message);
+        } else {
+          setGeneralError('حدث خطأ غير متوقع');
+        }
+      } finally {
+        setIsLoading(false);
+      }
     }
   };
 
@@ -44,6 +63,15 @@ export function Login({ onNavigate, onAuthSuccess }: LoginProps) {
       <Text style={{ textAlign: 'left', writingDirection: 'rtl', lineHeight: 24 }} className="mb-8 text-sm text-slate-500 text-center px-4">
         سجل دخولك لإدارة جدولك الجامعي بذكاء
       </Text>
+
+      {/* General Error */}
+      {!!generalError && (
+        <View className="mb-4 rounded-xl bg-red-50 border border-red-200 p-3">
+          <Text style={{ textAlign: 'center', writingDirection: 'rtl' }} className="text-sm font-bold text-red-600">
+            {generalError}
+          </Text>
+        </View>
+      )}
 
       {/* Email Field */}
       <View className="mb-4">
@@ -61,6 +89,7 @@ export function Login({ onNavigate, onAuthSuccess }: LoginProps) {
           onChangeText={(val) => {
             setEmail(val);
             if (emailError) setEmailError('');
+            if (generalError) setGeneralError('');
           }}
           onBlur={() => validateEmail(email)}
         />
@@ -85,7 +114,10 @@ export function Login({ onNavigate, onAuthSuccess }: LoginProps) {
             placeholderTextColor="#64748b"
             secureTextEntry={!showPassword}
             value={password}
-            onChangeText={setPassword}
+            onChangeText={(val) => {
+              setPassword(val);
+              if (generalError) setGeneralError('');
+            }}
           />
           {/* Absolute Left button - explicit zIndex and pixel left position */}
           <TouchableOpacity
@@ -112,11 +144,16 @@ export function Login({ onNavigate, onAuthSuccess }: LoginProps) {
       {/* Login Button */}
       <TouchableOpacity
         onPress={handleLogin}
-        className="mb-6 items-center justify-center rounded-2xl bg-indigo-600 py-4 shadow-sm"
+        disabled={isLoading}
+        className={`mb-6 items-center justify-center rounded-2xl bg-indigo-600 py-4 shadow-sm ${isLoading ? 'opacity-70' : ''}`}
       >
-        <Text style={{ textAlign: 'left' }} className="pb-1 text-base font-bold text-white">
-          تسجيل الدخول
-        </Text>
+        {isLoading ? (
+          <ActivityIndicator color="#ffffff" />
+        ) : (
+          <Text style={{ textAlign: 'left' }} className="pb-1 text-base font-bold text-white">
+            تسجيل الدخول
+          </Text>
+        )}
       </TouchableOpacity>
 
       {/* Register Link */}
