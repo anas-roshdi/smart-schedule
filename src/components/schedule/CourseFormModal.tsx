@@ -1,6 +1,16 @@
 import React, { useState } from "react";
-import { Modal, View, Text, TextInput, Pressable, ScrollView, StyleSheet } from "react-native";
-import { X, Plus, Minus, Trash2 } from "lucide-react-native";
+import {
+  Modal,
+  View,
+  Text,
+  TextInput,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  ActivityIndicator,
+  Alert,
+} from "react-native";
+import { X, Plus, Minus, Trash2, AlertCircle } from "lucide-react-native";
 import { COLORS } from "./colors";
 import { RegisteredCourse, OfferedSection, Session } from "./data";
 import { useSchedule } from "./ScheduleContext";
@@ -8,7 +18,7 @@ import { useSchedule } from "./ScheduleContext";
 export interface CourseFormModalProps {
   visible: boolean;
   onClose: () => void;
-  onSave: (course: any) => void;
+  onSave: (course: any) => Promise<void>;
   initialData?: RegisteredCourse | OfferedSection;
   target?: "registered" | "offered";
 }
@@ -35,6 +45,27 @@ export function CourseFormModal({
   );
 }
 
+function parseTimeToMinutes(timeStr: string): number | null {
+  if (!timeStr) return null;
+  const clean = timeStr.trim();
+  const match = clean.match(/^(\d{1,2}):(\d{2})\s*(ص|م)$/);
+  if (match) {
+    let h = parseInt(match[1], 10);
+    const m = parseInt(match[2], 10);
+    const period = match[3];
+    if (period === "ص" && h === 12) h = 0;
+    if (period === "م" && h !== 12) h += 12;
+    return h * 60 + m;
+  }
+  const match24 = clean.match(/^(\d{1,2}):(\d{2})$/);
+  if (match24) {
+    const h = parseInt(match24[1], 10);
+    const m = parseInt(match24[2], 10);
+    return h * 60 + m;
+  }
+  return null;
+}
+
 function CourseFormContent({
   onClose,
   onSave,
@@ -48,19 +79,25 @@ function CourseFormContent({
   const [section, setSection] = useState(initialData?.section || "");
   const [instructor, setInstructor] = useState(initialData?.instructor || "");
   const [type, setType] = useState<"نظري" | "عملي">(initialData?.type || "نظري");
-  const [mode, setMode] = useState<"حضوري" | "عن بعد">(initialData?.mode || "حضوري");
+  const [mode, setMode] = useState<"حضوري" | "عن بعد">(
+    initialData?.mode || "حضوري"
+  );
   const [sessions, setSessions] = useState<Session[]>(
     initialData?.sessions && initialData.sessions.length > 0
       ? initialData.sessions
       : [{ id: "s-1", day: "الأحد", startTime: "08:00 ص", endTime: "09:30 ص" }]
   );
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [formError, setFormError] = useState<string | null>(null);
 
   const handleCodeChange = (text: string) => {
     setCode(text);
     const trimmed = text.trim().toLowerCase();
     if (trimmed) {
       const match = [...registeredCourses, ...offeredSections].find(
-        (c) => c.code.trim().toLowerCase() === trimmed && typeof c.credits === "number"
+        (c) =>
+          c.code.trim().toLowerCase() === trimmed &&
+          typeof c.credits === "number"
       );
       if (match) {
         setCredits(match.credits);
@@ -71,7 +108,12 @@ function CourseFormContent({
   const addSession = () =>
     setSessions((prev) => [
       ...prev,
-      { id: Date.now().toString(), day: "الأحد", startTime: "08:00 ص", endTime: "09:30 ص" },
+      {
+        id: Date.now().toString(),
+        day: "الأحد",
+        startTime: "08:00 ص",
+        endTime: "09:30 ص",
+      },
     ]);
 
   const removeSession = (id: string) =>
@@ -83,68 +125,173 @@ function CourseFormContent({
     );
   };
 
-  const handleSave = () => {
-    if (!name.trim() || !code.trim() || !section.trim()) return;
-
-    if (target === "offered") {
-      const offeredItem: OfferedSection = {
-        id: initialData ? initialData.id : Date.now().toString(),
-        name: name.trim(),
-        code: code.trim(),
-        credits,
-        section: section.trim(),
-        instructor: instructor.trim(),
-        type,
-        mode,
-        sessions,
-        status: (initialData as OfferedSection)?.status ?? "open",
-      };
-      onSave(offeredItem);
-    } else {
-      const registeredItem: RegisteredCourse = {
-        id: initialData ? initialData.id : Date.now().toString(),
-        name: name.trim(),
-        code: code.trim(),
-        credits,
-        section: section.trim(),
-        instructor: instructor.trim(),
-        type,
-        mode,
-        sessions,
-        color: (initialData as RegisteredCourse)?.color || "bg-indigo-500",
-        locked: (initialData as RegisteredCourse)?.locked ?? false,
-      };
-      onSave(registeredItem);
+  const validate = (): string | null => {
+    if (!name.trim()) return "اسم المقرر مطلوب";
+    if (!code.trim()) return "رمز المقرر مطلوب";
+    if (!section.trim()) return "رقم الشعبة مطلوب";
+    if (!sessions || sessions.length === 0) {
+      return "يجب إضافة وقت واحد على الأقل";
     }
-    onClose();
+
+    for (let i = 0; i < sessions.length; i++) {
+      const sess = sessions[i];
+      if (!sess.day.trim()) return `يرجى تحديد اليوم للوقت رقم ${i + 1}`;
+      const startMin = parseTimeToMinutes(sess.startTime);
+      const endMin = parseTimeToMinutes(sess.endTime);
+
+      if (startMin === null) {
+        return `صيغة وقت البداية غير صالحة للوقت رقم ${i + 1} (مثال: 08:00 ص)`;
+      }
+      if (endMin === null) {
+        return `صيغة وقت النهاية غير صالحة للوقت رقم ${i + 1} (مثال: 09:30 ص)`;
+      }
+      if (endMin <= startMin) {
+        return `وقت النهاية للوقت رقم ${i + 1} يجب أن يكون بعد وقت البداية`;
+      }
+    }
+
+    // Check overlaps within same day
+    for (let i = 0; i < sessions.length; i++) {
+      for (let j = i + 1; j < sessions.length; j++) {
+        const s1 = sessions[i];
+        const s2 = sessions[j];
+        if (s1.day.trim() === s2.day.trim()) {
+          const start1 = parseTimeToMinutes(s1.startTime)!;
+          const end1 = parseTimeToMinutes(s1.endTime)!;
+          const start2 = parseTimeToMinutes(s2.startTime)!;
+          const end2 = parseTimeToMinutes(s2.endTime)!;
+
+          if (start1 < end2 && end1 > start2) {
+            return `يوجد تداخل بين الوقت ${i + 1} والوقت ${j + 1} في يوم ${s1.day}`;
+          }
+        }
+      }
+    }
+
+    return null;
+  };
+
+  const handleSave = async () => {
+    setFormError(null);
+    const validationError = validate();
+    if (validationError) {
+      setFormError(validationError);
+      return;
+    }
+
+    const payload =
+      target === "offered"
+        ? {
+            id: initialData ? initialData.id : "",
+            name: name.trim(),
+            code: code.trim(),
+            credits,
+            section: section.trim(),
+            instructor: instructor.trim(),
+            type,
+            mode,
+            sessions,
+            status: (initialData as OfferedSection)?.status ?? "open",
+          }
+        : {
+            id: initialData ? initialData.id : "",
+            name: name.trim(),
+            code: code.trim(),
+            credits,
+            section: section.trim(),
+            instructor: instructor.trim(),
+            type,
+            mode,
+            sessions,
+            color: (initialData as RegisteredCourse)?.color || "bg-indigo-500",
+            locked: (initialData as RegisteredCourse)?.locked ?? false,
+          };
+
+    setIsSubmitting(true);
+    try {
+      await onSave(payload);
+      onClose();
+    } catch (err: any) {
+      if (err?.sectionSaved) {
+        onClose();
+        Alert.alert(
+          "تنبيه",
+          `تم حفظ الشعبة في قائمة المطروحة لكنها لم تُضف إلى جدولك: ${err.message || ""}`
+        );
+        return;
+      }
+
+      if (
+        err?.status === 400 &&
+        Array.isArray(err?.errors) &&
+        err.errors.length > 0
+      ) {
+        const msg = err.errors.map((e: any) => e.message).join("، ");
+        setFormError(msg);
+      } else if (err?.message) {
+        setFormError(err.message);
+      } else {
+        setFormError("حدث خطأ أثناء حفظ البيانات");
+      }
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const headerTitle = initialData
-    ? (target === "offered" ? "تعديل الشعبة" : "تعديل المقرر")
-    : (target === "offered" ? "إضافة شعبة جديدة" : "إضافة مقرر جديد");
+    ? target === "offered"
+      ? "تعديل الشعبة"
+      : "تعديل المقرر"
+    : target === "offered"
+    ? "إضافة شعبة جديدة"
+    : "إضافة مقرر جديد";
 
-  const saveBtnText = target === "offered"
-    ? (initialData ? "حفظ التعديلات" : "إضافة الشعبة")
-    : (initialData ? "حفظ التعديلات" : "حفظ المقرر");
+  const saveBtnText =
+    target === "offered"
+      ? initialData
+        ? "حفظ التعديلات"
+        : "إضافة الشعبة"
+      : initialData
+      ? "حفظ التعديلات"
+      : "حفظ المقرر";
 
   return (
     <View style={s.overlay}>
       <View style={s.sheet}>
         {/* Header */}
-        <View className="w-full flex-row justify-between items-center mb-5">
-          <Text className="pb-1 leading-relaxed text-lg font-bold text-slate-900">{headerTitle}</Text>
-          <Pressable onPress={onClose} className="p-2 bg-slate-100 rounded-full">
+        <View className="w-full flex-row justify-between items-center mb-4">
+          <Text className="pb-1 leading-relaxed text-lg font-bold text-slate-900">
+            {headerTitle}
+          </Text>
+          <Pressable
+            disabled={isSubmitting}
+            onPress={onClose}
+            className="p-2 bg-slate-100 rounded-full"
+          >
             <X size={20} color={COLORS.slate600} />
           </Pressable>
         </View>
 
+        {/* Error Banner */}
+        {formError ? (
+          <View className="w-full bg-rose-50 border border-rose-200 rounded-xl p-3 mb-4 flex-row items-center gap-2">
+            <AlertCircle size={16} color="#e11d48" />
+            <Text
+              className="flex-1 text-xs font-semibold text-rose-600 leading-relaxed"
+              style={{ textAlign: "left", writingDirection: "rtl" }}
+            >
+              {formError}
+            </Text>
+          </View>
+        ) : null}
+
         <ScrollView className="w-full mb-4" showsVerticalScrollIndicator={false}>
-          <View style={{ width: '100%', gap: 16 }}>
+          <View style={{ width: "100%", gap: 16 }}>
             {/* Course name */}
-            <View style={{ width: '100%' }}>
+            <View style={{ width: "100%" }}>
               <Text
                 className="w-full text-sm font-semibold text-slate-700 mb-1.5 pb-0.5"
-                style={{ textAlign: 'left', writingDirection: 'rtl', width: '100%' }}
+                style={{ textAlign: "left", writingDirection: "rtl", width: "100%" }}
               >
                 اسم المقرر
               </Text>
@@ -163,10 +310,10 @@ function CourseFormContent({
             </View>
 
             {/* Course Code */}
-            <View style={{ width: '100%' }}>
+            <View style={{ width: "100%" }}>
               <Text
                 className="w-full text-sm font-semibold text-slate-700 mb-1.5 pb-0.5"
-                style={{ textAlign: 'left', writingDirection: 'rtl', width: '100%' }}
+                style={{ textAlign: "left", writingDirection: "rtl", width: "100%" }}
               >
                 رمز المقرر
               </Text>
@@ -185,10 +332,10 @@ function CourseFormContent({
             </View>
 
             {/* Credits Counter */}
-            <View style={{ width: '100%' }}>
+            <View style={{ width: "100%" }}>
               <Text
                 className="w-full text-sm font-semibold text-slate-700 mb-1.5 pb-0.5"
-                style={{ textAlign: 'left', writingDirection: 'rtl', width: '100%' }}
+                style={{ textAlign: "left", writingDirection: "rtl", width: "100%" }}
               >
                 الساعات المعتمدة
               </Text>
@@ -198,7 +345,10 @@ function CourseFormContent({
                   onPress={() => setCredits((prev) => Math.max(1, prev - 1))}
                   className="p-2 bg-slate-50 rounded-xl"
                 >
-                  <Minus size={20} color={credits <= 1 ? COLORS.slate300 : COLORS.slate600} />
+                  <Minus
+                    size={20}
+                    color={credits <= 1 ? COLORS.slate300 : COLORS.slate600}
+                  />
                 </Pressable>
                 <Text className="text-sm font-bold text-slate-800 pb-1 leading-relaxed">
                   {credits} {credits === 1 ? "ساعة" : "ساعات"}
@@ -208,16 +358,19 @@ function CourseFormContent({
                   onPress={() => setCredits((prev) => Math.min(6, prev + 1))}
                   className="p-2 bg-slate-50 rounded-xl"
                 >
-                  <Plus size={20} color={credits >= 6 ? COLORS.slate300 : COLORS.slate600} />
+                  <Plus
+                    size={20}
+                    color={credits >= 6 ? COLORS.slate300 : COLORS.slate600}
+                  />
                 </Pressable>
               </View>
             </View>
 
             {/* Section */}
-            <View style={{ width: '100%' }}>
+            <View style={{ width: "100%" }}>
               <Text
                 className="w-full text-sm font-semibold text-slate-700 mb-1.5 pb-0.5"
-                style={{ textAlign: 'left', writingDirection: 'rtl', width: '100%' }}
+                style={{ textAlign: "left", writingDirection: "rtl", width: "100%" }}
               >
                 الشعبة
               </Text>
@@ -236,10 +389,10 @@ function CourseFormContent({
             </View>
 
             {/* Instructor */}
-            <View style={{ width: '100%' }}>
+            <View style={{ width: "100%" }}>
               <Text
                 className="w-full text-sm font-semibold text-slate-700 mb-1.5 pb-0.5"
-                style={{ textAlign: 'left', writingDirection: 'rtl', width: '100%' }}
+                style={{ textAlign: "left", writingDirection: "rtl", width: "100%" }}
               >
                 دكتور المقرر
               </Text>
@@ -258,28 +411,40 @@ function CourseFormContent({
             </View>
 
             {/* Type + Mode toggles */}
-            <View style={{ width: '100%', flexDirection: 'row', gap: 12 }}>
+            <View style={{ width: "100%", flexDirection: "row", gap: 12 }}>
               <View style={{ flex: 1 }}>
                 <Text
                   className="w-full text-sm font-semibold text-slate-700 mb-1.5 pb-0.5"
-                  style={{ textAlign: 'left', writingDirection: 'rtl', width: '100%' }}
+                  style={{ textAlign: "left", writingDirection: "rtl", width: "100%" }}
                 >
                   النوع
                 </Text>
                 <View className="flex-row bg-slate-100 rounded-xl p-1">
                   <Pressable
                     onPress={() => setType("نظري")}
-                    className={`flex-1 py-2.5 rounded-lg items-center justify-center ${type === "نظري" ? "bg-white shadow-sm" : ""}`}
+                    className={`flex-1 py-2.5 rounded-lg items-center justify-center ${
+                      type === "نظري" ? "bg-white shadow-sm" : ""
+                    }`}
                   >
-                    <Text className={`pb-1 leading-relaxed text-xs font-bold text-center ${type === "نظري" ? "text-slate-900" : "text-slate-500"}`}>
+                    <Text
+                      className={`pb-1 leading-relaxed text-xs font-bold text-center ${
+                        type === "نظري" ? "text-slate-900" : "text-slate-500"
+                      }`}
+                    >
                       نظري
                     </Text>
                   </Pressable>
                   <Pressable
                     onPress={() => setType("عملي")}
-                    className={`flex-1 py-2.5 rounded-lg items-center justify-center ${type === "عملي" ? "bg-white shadow-sm" : ""}`}
+                    className={`flex-1 py-2.5 rounded-lg items-center justify-center ${
+                      type === "عملي" ? "bg-white shadow-sm" : ""
+                    }`}
                   >
-                    <Text className={`pb-1 leading-relaxed text-xs font-bold text-center ${type === "عملي" ? "text-slate-900" : "text-slate-500"}`}>
+                    <Text
+                      className={`pb-1 leading-relaxed text-xs font-bold text-center ${
+                        type === "عملي" ? "text-slate-900" : "text-slate-500"
+                      }`}
+                    >
                       عملي
                     </Text>
                   </Pressable>
@@ -289,24 +454,36 @@ function CourseFormContent({
               <View style={{ flex: 1 }}>
                 <Text
                   className="w-full text-sm font-semibold text-slate-700 mb-1.5 pb-0.5"
-                  style={{ textAlign: 'left', writingDirection: 'rtl', width: '100%' }}
+                  style={{ textAlign: "left", writingDirection: "rtl", width: "100%" }}
                 >
                   النمط
                 </Text>
                 <View className="flex-row bg-slate-100 rounded-xl p-1">
                   <Pressable
                     onPress={() => setMode("حضوري")}
-                    className={`flex-1 py-2.5 rounded-lg items-center justify-center ${mode === "حضوري" ? "bg-white shadow-sm" : ""}`}
+                    className={`flex-1 py-2.5 rounded-lg items-center justify-center ${
+                      mode === "حضوري" ? "bg-white shadow-sm" : ""
+                    }`}
                   >
-                    <Text className={`pb-1 leading-relaxed text-xs font-bold text-center ${mode === "حضوري" ? "text-slate-900" : "text-slate-500"}`}>
+                    <Text
+                      className={`pb-1 leading-relaxed text-xs font-bold text-center ${
+                        mode === "حضوري" ? "text-slate-900" : "text-slate-500"
+                      }`}
+                    >
                       حضوري
                     </Text>
                   </Pressable>
                   <Pressable
                     onPress={() => setMode("عن بعد")}
-                    className={`flex-1 py-2.5 rounded-lg items-center justify-center ${mode === "عن بعد" ? "bg-white shadow-sm" : ""}`}
+                    className={`flex-1 py-2.5 rounded-lg items-center justify-center ${
+                      mode === "عن بعد" ? "bg-white shadow-sm" : ""
+                    }`}
                   >
-                    <Text className={`pb-1 leading-relaxed text-xs font-bold text-center ${mode === "عن بعد" ? "text-slate-900" : "text-slate-500"}`}>
+                    <Text
+                      className={`pb-1 leading-relaxed text-xs font-bold text-center ${
+                        mode === "عن بعد" ? "text-slate-900" : "text-slate-500"
+                      }`}
+                    >
                       عن بعد
                     </Text>
                   </Pressable>
@@ -315,24 +492,43 @@ function CourseFormContent({
             </View>
 
             {/* Sessions */}
-            <View style={{ width: '100%', marginTop: 8 }}>
-              <View style={{ width: '100%', flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+            <View style={{ width: "100%", marginTop: 8 }}>
+              <View
+                style={{
+                  width: "100%",
+                  flexDirection: "row",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                  marginBottom: 12,
+                }}
+              >
                 <Text
                   className="pb-1 leading-relaxed text-sm font-bold text-slate-800"
-                  style={{ textAlign: 'left', writingDirection: 'rtl' }}
+                  style={{ textAlign: "left", writingDirection: "rtl" }}
                 >
                   الأوقات
                 </Text>
-                <Pressable onPress={addSession} className="flex-row items-center bg-indigo-50 px-2.5 py-1 rounded-lg gap-1">
+                <Pressable
+                  onPress={addSession}
+                  className="flex-row items-center bg-indigo-50 px-2.5 py-1 rounded-lg gap-1"
+                >
                   <Plus size={14} color={COLORS.indigo600} />
-                  <Text className="text-xs font-bold text-indigo-600 pb-0.5 leading-relaxed">إضافة وقت</Text>
+                  <Text className="text-xs font-bold text-indigo-600 pb-0.5 leading-relaxed">
+                    إضافة وقت
+                  </Text>
                 </Pressable>
               </View>
               <View className="gap-3 w-full items-stretch">
                 {sessions.map((sess, index) => (
-                  <View key={sess.id} className="w-full rounded-2xl border border-slate-200 bg-white p-3 gap-3 items-stretch">
+                  <View
+                    key={sess.id}
+                    className="w-full rounded-2xl border border-slate-200 bg-white p-3 gap-3 items-stretch"
+                  >
                     <View className="w-full flex-row justify-between items-center">
-                      <Text className="pb-1 leading-relaxed text-xs font-semibold text-slate-500" style={{ textAlign: "left", writingDirection: 'rtl' }}>
+                      <Text
+                        className="pb-1 leading-relaxed text-xs font-semibold text-slate-500"
+                        style={{ textAlign: "left", writingDirection: "rtl" }}
+                      >
                         وقت {index + 1}
                       </Text>
                       {sessions.length > 1 && (
@@ -387,12 +583,17 @@ function CourseFormContent({
         </ScrollView>
 
         <Pressable
+          disabled={isSubmitting}
           onPress={handleSave}
           className="w-full py-4 rounded-2xl bg-indigo-600 items-center justify-center active:bg-indigo-700"
         >
-          <Text className="text-base font-bold text-white pb-1 leading-relaxed">
-            {saveBtnText}
-          </Text>
+          {isSubmitting ? (
+            <ActivityIndicator size="small" color={COLORS.white} />
+          ) : (
+            <Text className="text-base font-bold text-white pb-1 leading-relaxed">
+              {saveBtnText}
+            </Text>
+          )}
         </Pressable>
       </View>
     </View>

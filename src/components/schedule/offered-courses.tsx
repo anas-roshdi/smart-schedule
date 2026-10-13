@@ -1,8 +1,25 @@
 import React, { useMemo, useState } from "react"
-import { TouchableOpacity, Text, TextInput, View, Modal } from "react-native"
-import { CalendarDays, Clock, Hash, MoreVertical, Plus, RefreshCw, Search, User } from "lucide-react-native"
+import {
+  TouchableOpacity,
+  Text,
+  TextInput,
+  View,
+  Modal,
+  Alert,
+  ActivityIndicator,
+} from "react-native"
+import {
+  CalendarDays,
+  Clock,
+  Hash,
+  MoreVertical,
+  Plus,
+  RefreshCw,
+  Search,
+  User,
+} from "lucide-react-native"
 import { COLORS } from "./colors"
-import { OfferedSection, RegisteredCourse } from "./data"
+import { OfferedSection } from "./data"
 import { useSchedule } from "./ScheduleContext"
 import { CourseFormModal } from "./CourseFormModal"
 
@@ -18,13 +35,14 @@ export function OfferedCourses() {
   const [editingSection, setEditingSection] = useState<OfferedSection | undefined>()
   const [menuFor, setMenuFor] = useState<OfferedSection | null>(null)
   const [deleteConfirmFor, setDeleteConfirmFor] = useState<OfferedSection | null>(null)
+  const [isDeleting, setIsDeleting] = useState(false)
   const [query, setQuery] = useState("")
 
   const results = useMemo(() => {
     const q = query.trim()
     if (!q) return offeredSections
     return offeredSections.filter(
-      (s) => s.name.includes(q) || s.code.toLowerCase().includes(q.toLowerCase()),
+      (s) => s.name.includes(q) || s.code.toLowerCase().includes(q.toLowerCase())
     )
   }, [query, offeredSections])
 
@@ -38,12 +56,16 @@ export function OfferedCourses() {
             setFormVisible(true)
           }}
           className="w-full flex-row items-center justify-center gap-2 rounded-2xl bg-indigo-600 py-3.5 active:bg-indigo-700"
-          style={{ shadowColor: '#4f46e5', shadowOffset: { width: 0, height: 10 }, shadowOpacity: 0.25, shadowRadius: 15, elevation: 5 }}
+          style={{
+            shadowColor: "#4f46e5",
+            shadowOffset: { width: 0, height: 10 },
+            shadowOpacity: 0.25,
+            shadowRadius: 15,
+            elevation: 5,
+          }}
         >
           <Plus size={20} color={COLORS.white} />
-          <Text className="text-sm font-bold text-white leading-relaxed">
-            إضافة
-          </Text>
+          <Text className="text-sm font-bold text-white leading-relaxed">إضافة</Text>
         </TouchableOpacity>
       </View>
 
@@ -60,7 +82,16 @@ export function OfferedCourses() {
           clearButtonMode="while-editing"
           autoCorrect={false}
           className="w-full rounded-2xl border border-slate-200 bg-white py-3.5 ps-11 pe-4 text-sm text-slate-800 text-right focus:border-indigo-400"
-          style={{ shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, shadowRadius: 2, elevation: 1, textAlign: "right", textAlignVertical: "center", includeFontPadding: false }}
+          style={{
+            shadowColor: "#000",
+            shadowOffset: { width: 0, height: 1 },
+            shadowOpacity: 0.05,
+            shadowRadius: 2,
+            elevation: 1,
+            textAlign: "right",
+            textAlignVertical: "center",
+            includeFontPadding: false,
+          }}
         />
       </View>
 
@@ -131,24 +162,39 @@ export function OfferedCourses() {
         <View className="flex-1 justify-center items-center bg-black/40 px-5">
           <View className="bg-white w-full rounded-2xl p-6 items-center">
             <Text className="text-lg font-bold text-slate-800 mb-2">تأكيد الحذف</Text>
-            <Text className="text-sm text-slate-500 mb-6 text-center">هل أنت متأكد من حذف هذا المقرر؟</Text>
+            <Text className="text-sm text-slate-500 mb-6 text-center">
+              هل أنت متأكد من حذف هذا المقرر؟
+            </Text>
             <View className="flex-row gap-3 w-full">
               <TouchableOpacity
+                disabled={isDeleting}
                 onPress={() => setDeleteConfirmFor(null)}
                 className="flex-1 py-3 rounded-xl bg-slate-100 items-center"
               >
                 <Text className="text-sm font-bold text-slate-700">إلغاء</Text>
               </TouchableOpacity>
               <TouchableOpacity
-                onPress={() => {
+                disabled={isDeleting}
+                onPress={async () => {
                   if (deleteConfirmFor) {
-                    deleteOfferedSection(deleteConfirmFor.id)
-                    setDeleteConfirmFor(null)
+                    setIsDeleting(true)
+                    try {
+                      await deleteOfferedSection(deleteConfirmFor.id)
+                      setDeleteConfirmFor(null)
+                    } catch (err: any) {
+                      Alert.alert("خطأ", err?.message || "تعذر حذف الشعبة")
+                    } finally {
+                      setIsDeleting(false)
+                    }
                   }
                 }}
-                className="flex-1 py-3 rounded-xl bg-rose-600 items-center"
+                className="flex-1 py-3 rounded-xl bg-rose-600 items-center justify-center"
               >
-                <Text className="text-sm font-bold text-white">حذف</Text>
+                {isDeleting ? (
+                  <ActivityIndicator size="small" color={COLORS.white} />
+                ) : (
+                  <Text className="text-sm font-bold text-white">حذف</Text>
+                )}
               </TouchableOpacity>
             </View>
           </View>
@@ -164,11 +210,11 @@ export function OfferedCourses() {
           setFormVisible(false)
           setEditingSection(undefined)
         }}
-        onSave={(data) => {
+        onSave={async (data) => {
           if (editingSection) {
-            updateOfferedSection(data.id, data)
+            await updateOfferedSection(data.id, data)
           } else {
-            addOfferedSection(data)
+            await addOfferedSection(data)
           }
         }}
       />
@@ -185,113 +231,125 @@ function OfferedSectionCard({
 }) {
   const {
     registeredCourses,
-    checkConflict,
-    getCourseByCodeAndType,
-    addCourse,
-    deleteCourse,
+    registerSection,
     toggleOfferedSectionStatus,
+    reload,
   } = useSchedule()
 
   const open = section.status === "open"
-  const alreadyAdded = registeredCourses.some(
-    (c) => c.code === section.code && c.type === section.type && c.section === section.section,
-  )
+  const alreadyAdded = registeredCourses.some((c) => c.id === section.id)
 
+  const [isRegistering, setIsRegistering] = useState(false)
+  const [isTogglingStatus, setIsTogglingStatus] = useState(false)
   const [alertModal, setAlertModal] = useState<{
     visible: boolean
     title: string
     message: string
     type: "error" | "confirmSwap"
-    oldCourseId?: string
   } | null>(null)
 
-  const handleAdd = () => {
-    if (checkConflict(section.sessions)) {
+  const handleRegisterError = (err: any) => {
+    if (err?.code === "TIME_CONFLICT") {
+      const conflicts = Array.isArray(err.details?.conflicts) ? err.details.conflicts : []
+      const conflictLines = conflicts.map(
+        (c: any) =>
+          `يتعارض مع: ${c.name} (${
+            c.type === "THEORY" || c.type === "نظري" ? "نظري" : "عملي"
+          })`
+      )
+      const message =
+        conflictLines.length > 0
+          ? conflictLines.join("\n")
+          : err.message || "يوجد تعارض في الوقت مع مقرر مسجل مسبقاً، لا يمكن الإضافة."
       setAlertModal({
         visible: true,
         title: "تعارض في الوقت",
-        message: "يوجد تعارض في الوقت مع مقرر مسجل مسبقاً، لا يمكن الإضافة.",
+        message,
         type: "error",
       })
-      return
-    }
-    const existing = getCourseByCodeAndType(section.code, section.type)
-    if (existing) {
-      if (existing.section === section.section) return // already added
+    } else if (err?.code === "SWAP_REQUIRED") {
+      const currentSection = err.details?.current
+      const currentSecStr = currentSection?.section
+        ? ` من ${currentSection.section}`
+        : ""
       setAlertModal({
         visible: true,
         title: "تغيير الشعبة",
-        message: `هذا المقرر مسجل مسبقاً. هل تريد تغيير الشعبة من ${existing.section} إلى ${section.section}؟`,
+        message: `هذا المقرر مسجل مسبقاً. هل تريد تغيير الشعبة${currentSecStr} إلى ${section.section}؟`,
         type: "confirmSwap",
-        oldCourseId: existing.id,
       })
-      return
+    } else if (err?.code === "ALREADY_REGISTERED") {
+      Alert.alert("تنبيه", err.message || "المقرر مسجل بالفعل")
+      reload().catch(() => {})
+    } else {
+      Alert.alert("تنبيه", err?.message || "حدث خطأ أثناء إضافة الشعبة")
     }
-
-    const registeredCourseItem: RegisteredCourse = {
-      id: section.id,
-      name: section.name,
-      code: section.code,
-      credits: section.credits,
-      section: section.section,
-      color: "bg-indigo-500",
-      type: section.type,
-      mode: section.mode,
-      instructor: section.instructor,
-      sessions: section.sessions,
-      locked: false,
-    }
-
-    addCourse(registeredCourseItem)
   }
 
-  const handleConfirmSwap = () => {
-    if (alertModal?.oldCourseId) {
-      const oldCourse = registeredCourses.find((c) => c.id === alertModal.oldCourseId)
-      deleteCourse(alertModal.oldCourseId)
-      const registeredCourseItem: RegisteredCourse = {
-        id: section.id,
-        name: section.name,
-        code: section.code,
-        credits: section.credits,
-        section: section.section,
-        color: "bg-indigo-500",
-        type: section.type,
-        mode: section.mode,
-        instructor: section.instructor,
-        sessions: section.sessions,
-        locked: oldCourse ? oldCourse.locked : false,
-      }
-      addCourse(registeredCourseItem)
+  const handleAdd = async () => {
+    if (isRegistering) return
+    setIsRegistering(true)
+    try {
+      await registerSection(section.id)
+    } catch (err: any) {
+      handleRegisterError(err)
+    } finally {
+      setIsRegistering(false)
     }
+  }
+
+  const handleConfirmSwap = async () => {
     setAlertModal(null)
+    setIsRegistering(true)
+    try {
+      await registerSection(section.id, { replace: true })
+    } catch (err: any) {
+      handleRegisterError(err)
+    } finally {
+      setIsRegistering(false)
+    }
+  }
+
+  const handleToggleStatus = async () => {
+    if (isTogglingStatus) return
+    setIsTogglingStatus(true)
+    try {
+      await toggleOfferedSectionStatus(section.id)
+    } catch (err: any) {
+      Alert.alert("خطأ", err?.message || "تعذر تغيير حالة الشعبة")
+    } finally {
+      setIsTogglingStatus(false)
+    }
   }
 
   return (
     <View
       className="rounded-2xl border border-slate-100 bg-white p-4"
-      style={{ shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, shadowRadius: 2, elevation: 1 }}
+      style={{
+        shadowColor: "#000",
+        shadowOffset: { width: 0, height: 1 },
+        shadowOpacity: 0.05,
+        shadowRadius: 2,
+        elevation: 1,
+      }}
     >
       <View className="flex-row items-start justify-between gap-2">
         <View className="flex-1">
-          <Text
-            numberOfLines={1}
-            className="text-base font-bold text-slate-900"
-          >
+          <Text numberOfLines={1} className="text-base font-bold text-slate-900">
             {section.name}
           </Text>
           <View className="mt-1 flex-row flex-wrap items-center gap-x-3 gap-y-1">
             <View className="flex-row items-center gap-1">
               <Hash size={14} color={COLORS.slate400} />
-              <Text className="text-xs font-medium text-slate-400">
-                {section.code}
-              </Text>
+              <Text className="text-xs font-medium text-slate-400">{section.code}</Text>
             </View>
             <Text className="text-xs font-medium text-slate-500">
               {section.section}
             </Text>
             <View className="rounded bg-sky-100 px-1.5 py-0.5">
-              <Text className="text-[10px] font-bold text-sky-700 leading-relaxed">{section.type}</Text>
+              <Text className="text-[10px] font-bold text-sky-700 leading-relaxed">
+                {section.type}
+              </Text>
             </View>
             <View className="rounded bg-indigo-100 px-1.5 py-0.5">
               <Text className="text-[10px] font-bold text-indigo-700 leading-relaxed">
@@ -303,7 +361,8 @@ function OfferedSectionCard({
         <View className="flex-row items-center gap-2">
           <StatusBadge
             status={section.status}
-            onPress={() => toggleOfferedSectionStatus(section.id)}
+            disabled={isTogglingStatus}
+            onPress={handleToggleStatus}
           />
           <TouchableOpacity
             accessibilityRole="button"
@@ -336,11 +395,23 @@ function OfferedSectionCard({
         <View className="flex-row items-center justify-between mt-2">
           <View className="flex-row items-center gap-1.5">
             <User size={14} color={COLORS.indigo500} />
-            <Text className="text-xs text-slate-600 leading-relaxed">{section.instructor}</Text>
+            <Text className="text-xs text-slate-600 leading-relaxed">
+              {section.instructor}
+            </Text>
           </View>
           <View className="flex-row items-center gap-1.5">
-            <View className={`rounded px-1.5 py-0.5 ${section.mode === "حضوري" ? "bg-emerald-100" : "bg-purple-100"}`}>
-              <Text className={`text-[10px] font-bold leading-relaxed ${section.mode === "حضوري" ? "text-emerald-700" : "text-purple-700"}`}>{section.mode}</Text>
+            <View
+              className={`rounded px-1.5 py-0.5 ${
+                section.mode === "حضوري" ? "bg-emerald-100" : "bg-purple-100"
+              }`}
+            >
+              <Text
+                className={`text-[10px] font-bold leading-relaxed ${
+                  section.mode === "حضوري" ? "text-emerald-700" : "text-purple-700"
+                }`}
+              >
+                {section.mode}
+              </Text>
             </View>
           </View>
         </View>
@@ -348,34 +419,71 @@ function OfferedSectionCard({
 
       <TouchableOpacity
         accessibilityRole="button"
-        disabled={!open || alreadyAdded}
+        disabled={!open || alreadyAdded || isRegistering}
         onPress={handleAdd}
-        className={`mt-3 flex-row items-center justify-center gap-1.5 rounded-xl py-2.5 ${alreadyAdded ? "bg-emerald-50" : open ? "bg-indigo-50 active:bg-indigo-100" : "bg-slate-50"}`}
+        className={`mt-3 flex-row items-center justify-center gap-1.5 rounded-xl py-2.5 ${
+          alreadyAdded
+            ? "bg-emerald-50"
+            : open
+            ? "bg-indigo-50 active:bg-indigo-100"
+            : "bg-slate-50"
+        }`}
       >
-        {!alreadyAdded && <Plus size={16} color={open ? COLORS.indigo600 : COLORS.slate300} />}
-        <Text
-          className={`text-sm font-bold ${alreadyAdded ? "text-emerald-600" : open ? "text-indigo-600" : "text-slate-300"}`}
-        >
-          {alreadyAdded ? "تمت الإضافة إلى الجدول" : open ? "إضافة إلى الجدول" : "الشعبة مغلقة"}
-        </Text>
+        {isRegistering ? (
+          <ActivityIndicator size="small" color={COLORS.indigo600} />
+        ) : (
+          <>
+            {!alreadyAdded && (
+              <Plus size={16} color={open ? COLORS.indigo600 : COLORS.slate300} />
+            )}
+            <Text
+              className={`text-sm font-bold ${
+                alreadyAdded
+                  ? "text-emerald-600"
+                  : open
+                  ? "text-indigo-600"
+                  : "text-slate-300"
+              }`}
+            >
+              {alreadyAdded
+                ? "تمت الإضافة إلى الجدول"
+                : open
+                ? "إضافة إلى الجدول"
+                : "الشعبة مغلقة"}
+            </Text>
+          </>
+        )}
       </TouchableOpacity>
 
       <Modal visible={!!alertModal?.visible} transparent animationType="fade">
         <View className="flex-1 justify-center items-center bg-black/40 px-5">
           <View className="bg-white w-full rounded-2xl p-6 items-center">
-            <Text className="text-lg font-bold text-slate-800 mb-2">{alertModal?.title}</Text>
-            <Text className="text-sm text-slate-500 mb-6 text-center leading-relaxed">{alertModal?.message}</Text>
+            <Text className="text-lg font-bold text-slate-800 mb-2">
+              {alertModal?.title}
+            </Text>
+            <Text className="text-sm text-slate-500 mb-6 text-center leading-relaxed">
+              {alertModal?.message}
+            </Text>
             <View className="flex-row gap-3 w-full">
               {alertModal?.type === "error" ? (
-                <TouchableOpacity onPress={() => setAlertModal(null)} className="flex-1 py-3 rounded-xl bg-slate-100 items-center">
+                <TouchableOpacity
+                  onPress={() => setAlertModal(null)}
+                  className="flex-1 py-3 rounded-xl bg-slate-100 items-center"
+                >
                   <Text className="text-sm font-bold text-slate-700">حسناً</Text>
                 </TouchableOpacity>
               ) : (
                 <>
-                  <TouchableOpacity onPress={() => setAlertModal(null)} className="flex-1 py-3 rounded-xl bg-slate-100 items-center">
+                  <TouchableOpacity
+                    onPress={() => setAlertModal(null)}
+                    className="flex-1 py-3 rounded-xl bg-slate-100 items-center"
+                  >
                     <Text className="text-sm font-bold text-slate-700">إلغاء</Text>
                   </TouchableOpacity>
-                  <TouchableOpacity onPress={handleConfirmSwap} className="flex-1 py-3 rounded-xl bg-indigo-600 items-center">
+                  <TouchableOpacity
+                    onPress={handleConfirmSwap}
+                    className="flex-1 py-3 rounded-xl bg-indigo-600 items-center"
+                  >
                     <Text className="text-sm font-bold text-white">تأكيد التغيير</Text>
                   </TouchableOpacity>
                 </>
@@ -388,16 +496,31 @@ function OfferedSectionCard({
   )
 }
 
-function StatusBadge({ status, onPress }: { status: "open" | "closed", onPress: () => void }) {
+function StatusBadge({
+  status,
+  onPress,
+  disabled,
+}: {
+  status: "open" | "closed"
+  onPress: () => void
+  disabled?: boolean
+}) {
   const open = status === "open"
   return (
     <TouchableOpacity
       accessibilityRole="button"
+      disabled={disabled}
       onPress={onPress}
       className={`flex-row items-center gap-1.5 self-start rounded-xl border px-3 py-1.5 ${
         open ? "bg-emerald-50 border-emerald-200" : "bg-rose-50 border-rose-200"
       }`}
-      style={{ shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, shadowRadius: 2, elevation: 1 }}
+      style={{
+        shadowColor: "#000",
+        shadowOffset: { width: 0, height: 1 },
+        shadowOpacity: 0.05,
+        shadowRadius: 2,
+        elevation: 1,
+      }}
     >
       <RefreshCw size={14} color={open ? "#059669" : "#e11d48"} />
       <Text
