@@ -206,10 +206,35 @@ export function ScheduleProvider({ children }: { children: ReactNode }) {
     setOffered((prev) => prev.filter((s) => s.id !== id));
   };
 
+  const sectionStatusReqSeq = useRef<Map<string, number>>(new Map());
+  const courseLockReqSeq = useRef<Map<string, number>>(new Map());
+
   const toggleOfferedSectionStatus = async (id: string) => {
-    const res = await patchSectionStatus(id);
-    const updated = toOfferedSection(res.section);
-    setOffered((prev) => prev.map((s) => (s.id === id ? updated : s)));
+    const nextSeq = (sectionStatusReqSeq.current.get(id) || 0) + 1;
+    sectionStatusReqSeq.current.set(id, nextSeq);
+
+    const previousOffered = offered;
+
+    setOffered((prev) =>
+      prev.map((s) =>
+        s.id === id
+          ? { ...s, status: s.status === "open" ? "closed" : "open" }
+          : s
+      )
+    );
+
+    try {
+      const res = await patchSectionStatus(id);
+      if (sectionStatusReqSeq.current.get(id) === nextSeq) {
+        const updated = toOfferedSection(res.section);
+        setOffered((prev) => prev.map((s) => (s.id === id ? updated : s)));
+      }
+    } catch (err) {
+      if (sectionStatusReqSeq.current.get(id) === nextSeq) {
+        setOffered(previousOffered);
+      }
+      throw err;
+    }
   };
 
   const registerSection = async (
@@ -225,12 +250,35 @@ export function ScheduleProvider({ children }: { children: ReactNode }) {
 
   const toggleCourseLock = async (code: string) => {
     const normalizedCode = code.trim().toUpperCase();
+    const nextSeq = (courseLockReqSeq.current.get(normalizedCode) || 0) + 1;
+    courseLockReqSeq.current.set(normalizedCode, nextSeq);
+
+    const previousCourses = courses;
+
     const hasAnyUnlocked = courses.some(
       (c) => c.code.trim().toUpperCase() === normalizedCode && !c.locked
     );
     const newLocked = hasAnyUnlocked;
-    const res = await setCourseLockApi(code, newLocked);
-    setCourses(res.schedule.sections.map(toRegisteredCourse));
+
+    setCourses((prev) =>
+      prev.map((c) =>
+        c.code.trim().toUpperCase() === normalizedCode
+          ? { ...c, locked: newLocked }
+          : c
+      )
+    );
+
+    try {
+      const res = await setCourseLockApi(code, newLocked);
+      if (courseLockReqSeq.current.get(normalizedCode) === nextSeq) {
+        setCourses(res.schedule.sections.map(toRegisteredCourse));
+      }
+    } catch (err) {
+      if (courseLockReqSeq.current.get(normalizedCode) === nextSeq) {
+        setCourses(previousCourses);
+      }
+      throw err;
+    }
   };
 
   const isCourseLocked = (code: string) => {

@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from "react"
+import React, { useMemo, useState, useRef } from "react"
 import {
   TouchableOpacity,
   Text,
@@ -250,7 +250,7 @@ function OfferedSectionCard({
   const alreadyAdded = registeredCourses.some((c) => c.id === section.id)
 
   const [isRegistering, setIsRegistering] = useState(false)
-  const [isTogglingStatus, setIsTogglingStatus] = useState(false)
+  const pendingStatusToggle = useRef(false)
   const [alertModal, setAlertModal] = useState<{
     visible: boolean
     title: string
@@ -330,14 +330,14 @@ function OfferedSectionCard({
   }
 
   const handleToggleStatus = async () => {
-    if (isTogglingStatus) return
-    setIsTogglingStatus(true)
+    if (pendingStatusToggle.current) return
+    pendingStatusToggle.current = true
     try {
       await toggleOfferedSectionStatus(section.id)
     } catch (err: any) {
       showError(err, { title: "تعذر تغيير حالة الشعبة" })
     } finally {
-      setIsTogglingStatus(false)
+      pendingStatusToggle.current = false
     }
   }
 
@@ -380,7 +380,6 @@ function OfferedSectionCard({
         <View className="flex-row items-center gap-2">
           <StatusBadge
             status={section.status}
-            disabled={isTogglingStatus}
             onPress={handleToggleStatus}
           />
           <TouchableOpacity

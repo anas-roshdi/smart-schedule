@@ -20,7 +20,7 @@ import { RegisteredCourse } from "./data"
 import { useSchedule } from "./ScheduleContext"
 import { CourseFormModal } from "./CourseFormModal"
 import { useDialog } from "../ui/dialog-provider"
-import { useState } from "react"
+import { useState, useRef } from "react"
 
 export function RegisteredCourses() {
   const {
@@ -39,19 +39,20 @@ export function RegisteredCourses() {
   const [menuFor, setMenuFor] = useState<RegisteredCourse | null>(null)
   const [deleteConfirmFor, setDeleteConfirmFor] = useState<RegisteredCourse | null>(null)
   const [isDeleting, setIsDeleting] = useState(false)
-  const [lockingCode, setLockingCode] = useState<string | null>(null)
+  const pendingLocks = useRef<Set<string>>(new Set())
 
   const isOverLimit = totalCredits > maxCredits
 
   const handleToggleLock = async (code: string) => {
-    if (lockingCode) return
-    setLockingCode(code)
+    const norm = code.trim().toUpperCase()
+    if (pendingLocks.current.has(norm)) return
+    pendingLocks.current.add(norm)
     try {
       await toggleCourseLock(code)
     } catch (err: any) {
       showError(err, { title: "تعذر تغيير حالة التثبيت" })
     } finally {
-      setLockingCode(null)
+      pendingLocks.current.delete(norm)
     }
   }
 
@@ -133,7 +134,6 @@ export function RegisteredCourses() {
       ) : (
         <View className="gap-3">
           {registeredCourses.map((course) => {
-            const isLockingThis = lockingCode === course.code
             return (
               <View
                 key={course.id}
@@ -157,7 +157,7 @@ export function RegisteredCourses() {
                       <Text className="text-base font-bold text-slate-900">
                         {course.name}
                       </Text>
-                      <View className="mt-1 flex-row items-center gap-2">
+                      <View className="mt-1 flex-row flex-wrap items-center gap-2">
                         <View className="rounded-lg bg-slate-100 px-2 py-1">
                           <Text className="text-xs font-semibold text-slate-600">
                             {course.section}
@@ -191,14 +191,11 @@ export function RegisteredCourses() {
                     <View className="flex-row items-center gap-1">
                       <TouchableOpacity
                         accessibilityRole="button"
-                        disabled={isLockingThis}
                         hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
                         onPress={() => handleToggleLock(course.code)}
                         className="p-1.5 rounded-lg active:bg-slate-100"
                       >
-                        {isLockingThis ? (
-                          <ActivityIndicator size="small" color={COLORS.indigo600} />
-                        ) : course.locked ? (
+                        {course.locked ? (
                           <Lock size={18} color={COLORS.indigo600} />
                         ) : (
                           <Unlock size={18} color={COLORS.slate400} />

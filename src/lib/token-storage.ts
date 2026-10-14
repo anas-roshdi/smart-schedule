@@ -2,23 +2,32 @@ import * as SecureStore from 'expo-secure-store';
 import { Platform } from 'react-native';
 
 const TOKEN_KEY = 'auth_token';
+let cachedToken: string | null | undefined = undefined;
 
 export async function getToken(): Promise<string | null> {
+  if (cachedToken !== undefined) {
+    return cachedToken;
+  }
   try {
     if (Platform.OS === 'web') {
       if (typeof window !== 'undefined' && window.localStorage) {
-        return window.localStorage.getItem(TOKEN_KEY);
+        cachedToken = window.localStorage.getItem(TOKEN_KEY);
+        return cachedToken;
       }
+      cachedToken = null;
       return null;
     }
-    return await SecureStore.getItemAsync(TOKEN_KEY);
+    cachedToken = await SecureStore.getItemAsync(TOKEN_KEY);
+    return cachedToken;
   } catch (error) {
     console.error('Error reading token:', error);
+    cachedToken = null;
     return null;
   }
 }
 
 export async function setToken(token: string): Promise<void> {
+  cachedToken = token;
   try {
     if (Platform.OS === 'web') {
       if (typeof window !== 'undefined' && window.localStorage) {
@@ -33,6 +42,7 @@ export async function setToken(token: string): Promise<void> {
 }
 
 export async function clearToken(): Promise<void> {
+  cachedToken = null;
   try {
     if (Platform.OS === 'web') {
       if (typeof window !== 'undefined' && window.localStorage) {
@@ -45,3 +55,4 @@ export async function clearToken(): Promise<void> {
     console.error('Error clearing token:', error);
   }
 }
+
