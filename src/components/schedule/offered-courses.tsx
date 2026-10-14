@@ -5,7 +5,6 @@ import {
   TextInput,
   View,
   Modal,
-  Alert,
   ActivityIndicator,
 } from "react-native"
 import {
@@ -22,6 +21,7 @@ import { COLORS } from "./colors"
 import { OfferedSection } from "./data"
 import { useSchedule } from "./ScheduleContext"
 import { CourseFormModal } from "./CourseFormModal"
+import { useDialog } from "../ui/dialog-provider"
 
 export function OfferedCourses() {
   const {
@@ -30,6 +30,7 @@ export function OfferedCourses() {
     updateOfferedSection,
     deleteOfferedSection,
   } = useSchedule()
+  const { showDialog, showError } = useDialog()
 
   const [formVisible, setFormVisible] = useState(false)
   const [editingSection, setEditingSection] = useState<OfferedSection | undefined>()
@@ -182,7 +183,15 @@ export function OfferedCourses() {
                       await deleteOfferedSection(deleteConfirmFor.id)
                       setDeleteConfirmFor(null)
                     } catch (err: any) {
-                      Alert.alert("خطأ", err?.message || "تعذر حذف الشعبة")
+                      if (err?.code === "SECTION_REGISTERED") {
+                        showDialog({
+                          variant: "error",
+                          title: "لا يمكن حذف الشعبة",
+                          message: err.message || "الشعبة مسجلة في جدولك، لا يمكن حذفها",
+                        })
+                      } else {
+                        showError(err, { title: "تعذر حذف الشعبة" })
+                      }
                     } finally {
                       setIsDeleting(false)
                     }
@@ -235,6 +244,7 @@ function OfferedSectionCard({
     toggleOfferedSectionStatus,
     reload,
   } = useSchedule()
+  const { showDialog, showError } = useDialog()
 
   const open = section.status === "open"
   const alreadyAdded = registeredCourses.some((c) => c.id === section.id)
@@ -245,26 +255,25 @@ function OfferedSectionCard({
     visible: boolean
     title: string
     message: string
+    conflicts?: any[]
     type: "error" | "confirmSwap"
   } | null>(null)
 
   const handleRegisterError = (err: any) => {
     if (err?.code === "TIME_CONFLICT") {
-      const conflicts = Array.isArray(err.details?.conflicts) ? err.details.conflicts : []
-      const conflictLines = conflicts.map(
-        (c: any) =>
-          `يتعارض مع: ${c.name} (${
-            c.type === "THEORY" || c.type === "نظري" ? "نظري" : "عملي"
-          })`
-      )
+      const conflicts = Array.isArray(err.details?.conflicts)
+        ? err.details.conflicts
+        : []
       const message =
-        conflictLines.length > 0
-          ? conflictLines.join("\n")
-          : err.message || "يوجد تعارض في الوقت مع مقرر مسجل مسبقاً، لا يمكن الإضافة."
+        conflicts.length > 0
+          ? "يوجد تعارض في الوقت مع المقررات المسجلة التالية:"
+          : err.message ||
+            "يوجد تعارض في الوقت مع مقرر مسجل مسبقاً، لا يمكن الإضافة."
       setAlertModal({
         visible: true,
         title: "تعارض في الوقت",
         message,
+        conflicts,
         type: "error",
       })
     } else if (err?.code === "SWAP_REQUIRED") {
@@ -279,10 +288,20 @@ function OfferedSectionCard({
         type: "confirmSwap",
       })
     } else if (err?.code === "ALREADY_REGISTERED") {
-      Alert.alert("تنبيه", err.message || "المقرر مسجل بالفعل")
+      showDialog({
+        variant: "info",
+        title: "مضافة مسبقاً",
+        message: err.message || "المقرر مسجل بالفعل",
+      })
       reload().catch(() => {})
+    } else if (err?.code === "SECTION_CLOSED") {
+      showDialog({
+        variant: "warning",
+        title: "الشعبة مغلقة",
+        message: err.message || "الشعبة مغلقة حالياً",
+      })
     } else {
-      Alert.alert("تنبيه", err?.message || "حدث خطأ أثناء إضافة الشعبة")
+      showError(err, { title: "تنبيه" })
     }
   }
 
@@ -316,7 +335,7 @@ function OfferedSectionCard({
     try {
       await toggleOfferedSectionStatus(section.id)
     } catch (err: any) {
-      Alert.alert("خطأ", err?.message || "تعذر تغيير حالة الشعبة")
+      showError(err, { title: "تعذر تغيير حالة الشعبة" })
     } finally {
       setIsTogglingStatus(false)
     }
@@ -461,9 +480,32 @@ function OfferedSectionCard({
             <Text className="text-lg font-bold text-slate-800 mb-2">
               {alertModal?.title}
             </Text>
-            <Text className="text-sm text-slate-500 mb-6 text-center leading-relaxed">
+            <Text className="text-sm text-slate-500 mb-4 text-center leading-relaxed">
               {alertModal?.message}
             </Text>
+            {alertModal?.conflicts && alertModal.conflicts.length > 0 && (
+              <View className="w-full mb-4 gap-2 rounded-xl bg-slate-50 p-3 border border-slate-100">
+                {alertModal.conflicts.map((c: any, idx: number) => {
+                  const typeStr =
+                    c.type === "THEORY" || c.type === "نظري" ? "نظري" : "عملي"
+                  return (
+                    <View
+                      key={idx}
+                      className="flex-row items-center gap-2"
+                      style={{ direction: "rtl" }}
+                    >
+                      <View className="size-2 rounded-full bg-rose-500" />
+                      <Text
+                        className="text-xs font-bold text-slate-700"
+                        style={{ textAlign: "right", writingDirection: "rtl" }}
+                      >
+                        {c.name} ({typeStr})
+                      </Text>
+                    </View>
+                  )
+                })}
+              </View>
+            )}
             <View className="flex-row gap-3 w-full">
               {alertModal?.type === "error" ? (
                 <TouchableOpacity

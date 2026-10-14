@@ -127,12 +127,25 @@ export function ScheduleProvider({ children }: { children: ReactNode }) {
       newlyCreated = true;
     } catch (err: any) {
       if (err?.code === "DUPLICATE_SECTION") {
-        const existing = offered.find(
+        let existing = offered.find(
           (s) =>
             s.code.trim().toUpperCase() === data.code.trim().toUpperCase() &&
             s.type === data.type &&
             s.section.trim() === data.section.trim()
         );
+        if (!existing) {
+          try {
+            const secRes = await fetchSections();
+            const freshOffered = secRes.sections.map(toOfferedSection);
+            setOffered(freshOffered);
+            existing = freshOffered.find(
+              (s) =>
+                s.code.trim().toUpperCase() === data.code.trim().toUpperCase() &&
+                s.type === data.type &&
+                s.section.trim() === data.section.trim()
+            );
+          } catch {}
+        }
         if (existing) {
           sectionId = existing.id;
         } else {
@@ -156,9 +169,9 @@ export function ScheduleProvider({ children }: { children: ReactNode }) {
       }
     } catch (err: any) {
       if (newlyCreated) {
-        fetchSections()
-          .then((secRes) => setOffered(secRes.sections.map(toOfferedSection)))
-          .catch(() => {});
+        try {
+          await reload();
+        } catch {}
         err.sectionSaved = true;
       }
       throw err;

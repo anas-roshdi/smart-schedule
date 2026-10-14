@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useRef } from "react";
 import {
   Modal,
   View,
@@ -8,7 +8,7 @@ import {
   ScrollView,
   StyleSheet,
   ActivityIndicator,
-  Alert,
+  Keyboard,
 } from "react-native";
 import { X, Plus, Minus, Trash2, AlertCircle } from "lucide-react-native";
 import { COLORS } from "./colors";
@@ -73,6 +73,7 @@ function CourseFormContent({
   target,
 }: Omit<CourseFormModalProps, "visible"> & { target: "registered" | "offered" }) {
   const { registeredCourses, offeredSections } = useSchedule();
+  const scrollRef = useRef<ScrollView>(null);
   const [name, setName] = useState(initialData?.name || "");
   const [code, setCode] = useState(initialData?.code || "");
   const [credits, setCredits] = useState<number>(initialData?.credits ?? 3);
@@ -90,7 +91,20 @@ function CourseFormContent({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
 
+  const clearError = () => {
+    if (formError) {
+      setFormError(null);
+    }
+  };
+
+  const displayError = (msg: string) => {
+    Keyboard.dismiss();
+    setFormError(msg);
+    scrollRef.current?.scrollTo({ y: 0, animated: true });
+  };
+
   const handleCodeChange = (text: string) => {
+    clearError();
     setCode(text);
     const trimmed = text.trim().toLowerCase();
     if (trimmed) {
@@ -105,7 +119,8 @@ function CourseFormContent({
     }
   };
 
-  const addSession = () =>
+  const addSession = () => {
+    clearError();
     setSessions((prev) => [
       ...prev,
       {
@@ -115,11 +130,15 @@ function CourseFormContent({
         endTime: "09:30 ص",
       },
     ]);
+  };
 
-  const removeSession = (id: string) =>
+  const removeSession = (id: string) => {
+    clearError();
     setSessions((prev) => prev.filter((s) => s.id !== id));
+  };
 
   const updateSession = (id: string, key: keyof Session, value: string) => {
+    clearError();
     setSessions((prev) =>
       prev.map((s) => (s.id === id ? { ...s, [key]: value } : s))
     );
@@ -172,10 +191,10 @@ function CourseFormContent({
   };
 
   const handleSave = async () => {
-    setFormError(null);
+    clearError();
     const validationError = validate();
     if (validationError) {
-      setFormError(validationError);
+      displayError(validationError);
       return;
     }
 
@@ -213,10 +232,8 @@ function CourseFormContent({
       onClose();
     } catch (err: any) {
       if (err?.sectionSaved) {
-        onClose();
-        Alert.alert(
-          "تنبيه",
-          `تم حفظ الشعبة في قائمة المطروحة لكنها لم تُضف إلى جدولك: ${err.message || ""}`
+        displayError(
+          `حُفظت الشعبة في قائمة المطروحة لكنها لم تُضف إلى جدولك: ${err.message || ""}. يمكنك إضافتها من تبويب المطروحة`
         );
         return;
       }
@@ -227,11 +244,11 @@ function CourseFormContent({
         err.errors.length > 0
       ) {
         const msg = err.errors.map((e: any) => e.message).join("، ");
-        setFormError(msg);
+        displayError(msg);
       } else if (err?.message) {
-        setFormError(err.message);
+        displayError(err.message);
       } else {
-        setFormError("حدث خطأ أثناء حفظ البيانات");
+        displayError("حدث خطأ أثناء حفظ البيانات");
       }
     } finally {
       setIsSubmitting(false);
@@ -272,20 +289,25 @@ function CourseFormContent({
           </Pressable>
         </View>
 
-        {/* Error Banner */}
-        {formError ? (
-          <View className="w-full bg-rose-50 border border-rose-200 rounded-xl p-3 mb-4 flex-row items-center gap-2">
-            <AlertCircle size={16} color="#e11d48" />
-            <Text
-              className="flex-1 text-xs font-semibold text-rose-600 leading-relaxed"
-              style={{ textAlign: "left", writingDirection: "rtl" }}
-            >
-              {formError}
-            </Text>
-          </View>
-        ) : null}
+        <ScrollView
+          ref={scrollRef}
+          className="w-full mb-4"
+          showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
+        >
+          {/* Prominent Error Banner */}
+          {formError ? (
+            <View className="w-full bg-red-50 border border-red-200 rounded-2xl p-4 mb-4 flex-row items-center gap-3">
+              <AlertCircle size={20} color="#dc2626" />
+              <Text
+                className="flex-1 text-sm font-bold text-red-600 leading-relaxed"
+                style={{ textAlign: "right", writingDirection: "rtl" }}
+              >
+                {formError}
+              </Text>
+            </View>
+          ) : null}
 
-        <ScrollView className="w-full mb-4" showsVerticalScrollIndicator={false}>
           <View style={{ width: "100%", gap: 16 }}>
             {/* Course name */}
             <View style={{ width: "100%" }}>
@@ -297,7 +319,10 @@ function CourseFormContent({
               </Text>
               <TextInput
                 value={name}
-                onChangeText={setName}
+                onChangeText={(val) => {
+                  clearError();
+                  setName(val);
+                }}
                 className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-800"
                 style={{
                   textAlign: "right",
@@ -342,7 +367,10 @@ function CourseFormContent({
               <View className="w-full flex-row items-center justify-between bg-white border border-indigo-200 rounded-2xl p-2">
                 <Pressable
                   disabled={credits <= 1}
-                  onPress={() => setCredits((prev) => Math.max(1, prev - 1))}
+                  onPress={() => {
+                    clearError();
+                    setCredits((prev) => Math.max(1, prev - 1));
+                  }}
                   className="p-2 bg-slate-50 rounded-xl"
                 >
                   <Minus
@@ -355,7 +383,10 @@ function CourseFormContent({
                 </Text>
                 <Pressable
                   disabled={credits >= 6}
-                  onPress={() => setCredits((prev) => Math.min(6, prev + 1))}
+                  onPress={() => {
+                    clearError();
+                    setCredits((prev) => Math.min(6, prev + 1));
+                  }}
                   className="p-2 bg-slate-50 rounded-xl"
                 >
                   <Plus
@@ -376,7 +407,10 @@ function CourseFormContent({
               </Text>
               <TextInput
                 value={section}
-                onChangeText={setSection}
+                onChangeText={(val) => {
+                  clearError();
+                  setSection(val);
+                }}
                 className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-800"
                 style={{
                   textAlign: "right",
@@ -398,7 +432,10 @@ function CourseFormContent({
               </Text>
               <TextInput
                 value={instructor}
-                onChangeText={setInstructor}
+                onChangeText={(val) => {
+                  clearError();
+                  setInstructor(val);
+                }}
                 className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-800"
                 style={{
                   textAlign: "right",
@@ -421,7 +458,10 @@ function CourseFormContent({
                 </Text>
                 <View className="flex-row bg-slate-100 rounded-xl p-1">
                   <Pressable
-                    onPress={() => setType("نظري")}
+                    onPress={() => {
+                      clearError();
+                      setType("نظري");
+                    }}
                     className={`flex-1 py-2.5 rounded-lg items-center justify-center ${
                       type === "نظري" ? "bg-white shadow-sm" : ""
                     }`}
@@ -435,7 +475,10 @@ function CourseFormContent({
                     </Text>
                   </Pressable>
                   <Pressable
-                    onPress={() => setType("عملي")}
+                    onPress={() => {
+                      clearError();
+                      setType("عملي");
+                    }}
                     className={`flex-1 py-2.5 rounded-lg items-center justify-center ${
                       type === "عملي" ? "bg-white shadow-sm" : ""
                     }`}
@@ -460,7 +503,10 @@ function CourseFormContent({
                 </Text>
                 <View className="flex-row bg-slate-100 rounded-xl p-1">
                   <Pressable
-                    onPress={() => setMode("حضوري")}
+                    onPress={() => {
+                      clearError();
+                      setMode("حضوري");
+                    }}
                     className={`flex-1 py-2.5 rounded-lg items-center justify-center ${
                       mode === "حضوري" ? "bg-white shadow-sm" : ""
                     }`}
@@ -474,7 +520,10 @@ function CourseFormContent({
                     </Text>
                   </Pressable>
                   <Pressable
-                    onPress={() => setMode("عن بعد")}
+                    onPress={() => {
+                      clearError();
+                      setMode("عن بعد");
+                    }}
                     className={`flex-1 py-2.5 rounded-lg items-center justify-center ${
                       mode === "عن بعد" ? "bg-white shadow-sm" : ""
                     }`}

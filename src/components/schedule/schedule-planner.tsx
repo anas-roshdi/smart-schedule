@@ -26,6 +26,7 @@ import { Preferences } from "./preferences"
 import { RegisteredCourses } from "./registered-courses"
 import { ScheduleProvider, useSchedule } from "./ScheduleContext"
 import { SchedulesView } from "./schedules-view"
+import { useDialog } from "../ui/dialog-provider"
 
 type Tab = "registered" | "offered" | "preferences" | "schedules"
 
@@ -46,6 +47,7 @@ export function SchedulePlanner() {
 
 function SchedulePlannerContent() {
   const { isLoading, loadError, reload } = useSchedule()
+  const { showError } = useDialog()
   const [tab, setTab] = useState<Tab>("registered")
   const [activeNav, setActiveNav] = useState<string>("registered")
   const [isProfileMenuVisible, setIsProfileMenuVisible] = useState(false)
@@ -117,9 +119,13 @@ function SchedulePlannerContent() {
               <TouchableOpacity
                 className="flex-row items-center px-4 py-3"
                 onPress={async () => {
-                  setIsProfileMenuVisible(false)
-                  await logout()
-                  router.replace("/")
+                  try {
+                    setIsProfileMenuVisible(false)
+                    await logout()
+                    router.replace("/")
+                  } catch (err) {
+                    showError(err)
+                  }
                 }}
               >
                 <Text
@@ -155,7 +161,7 @@ function SchedulePlannerContent() {
           </Text>
           <TouchableOpacity
             accessibilityRole="button"
-            onPress={() => reload().catch(() => {})}
+            onPress={() => reload().catch((err) => showError(err))}
             className="rounded-2xl bg-indigo-600 px-6 py-3.5 items-center justify-center active:bg-indigo-700"
           >
             <Text className="text-sm font-bold text-white">إعادة المحاولة</Text>

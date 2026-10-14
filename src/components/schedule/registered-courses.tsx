@@ -13,13 +13,13 @@ import {
   TouchableOpacity,
   View,
   Modal,
-  Alert,
   ActivityIndicator,
 } from "react-native"
 import { COLORS } from "./colors"
 import { RegisteredCourse } from "./data"
 import { useSchedule } from "./ScheduleContext"
 import { CourseFormModal } from "./CourseFormModal"
+import { useDialog } from "../ui/dialog-provider"
 import { useState } from "react"
 
 export function RegisteredCourses() {
@@ -32,6 +32,7 @@ export function RegisteredCourses() {
     totalCredits,
     toggleCourseLock,
   } = useSchedule()
+  const { showError } = useDialog()
 
   const [formVisible, setFormVisible] = useState(false)
   const [editingCourse, setEditingCourse] = useState<RegisteredCourse | undefined>()
@@ -48,7 +49,7 @@ export function RegisteredCourses() {
     try {
       await toggleCourseLock(code)
     } catch (err: any) {
-      Alert.alert("خطأ", err?.message || "تعذر تغيير حالة التثبيت")
+      showError(err, { title: "تعذر تغيير حالة التثبيت" })
     } finally {
       setLockingCode(null)
     }
@@ -61,7 +62,7 @@ export function RegisteredCourses() {
       await deleteCourse(deleteConfirmFor.id)
       setDeleteConfirmFor(null)
     } catch (err: any) {
-      Alert.alert("خطأ", err?.message || "تعذر إلغاء تسجيل المقرر")
+      showError(err, { title: "تعذر إلغاء تسجيل المقرر" })
     } finally {
       setIsDeleting(false)
     }
