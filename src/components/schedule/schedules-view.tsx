@@ -12,6 +12,7 @@ import {
 } from "lucide-react-native"
 import { useCallback, useEffect, useMemo, useState } from "react"
 import {
+  ActivityIndicator,
   Modal,
   ScrollView,
   StatusBar,
@@ -20,180 +21,27 @@ import {
   View,
 } from "react-native"
 import { COLORS } from "./colors"
+import { useSchedule } from "./ScheduleContext"
+import { useDialog } from "../ui/dialog-provider"
+import {
+  getCourseColor,
+  toScheduleFromSections,
+  perkLabel,
+  Schedule,
+  CourseEntry,
+} from "../../lib/mappers"
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
 type ViewMode = "agenda" | "grid"
-type ScheduleId = "original" | "prop1" | "prop2"
 type ActionType = "keep" | "add" | "delete" | "change"
-
-interface CourseEntry {
-  id: string
-  /** e.g. "CS101" — used for matching across schedules */
-  code: string
-  time: string
-  name: string
-  section: string
-  /** "نظري" | "عملي" */
-  type: string
-}
-
-interface DaySchedule {
-  day: string
-  courses: CourseEntry[]
-}
-
-interface Schedule {
-  id: string
-  title: string
-  perk: string
-  days: DaySchedule[]
-}
 
 interface ActionStep {
   type: ActionType
   message: string
 }
 
-// ─── Dummy Data ──────────────────────────────────────────────────────────────
-
 const ALL_DAYS = ["يوم الأحد", "يوم الإثنين", "يوم الثلاثاء", "يوم الأربعاء", "يوم الخميس"]
-
-const ORIGINAL_SCHEDULE: Schedule = {
-  id: "original",
-  title: "الجدول الأصلي",
-  perk: "📋 الجدول الحالي بدون تعديل",
-  days: [
-    {
-      day: "يوم الأحد",
-      courses: [
-        { id: "o1", code: "CS101", time: "08:00 - 08:50", name: "مقدمة في البرمجة", section: "شعبة 3", type: "نظري" },
-        { id: "o2", code: "MATH201", time: "10:00 - 10:50", name: "تفاضل وتكامل 1", section: "شعبة 1", type: "نظري" },
-        { id: "o3", code: "PHYS101", time: "12:00 - 12:50", name: "فيزياء عامة", section: "شعبة 2", type: "نظري" },
-      ],
-    },
-    {
-      day: "يوم الإثنين",
-      courses: [
-        { id: "o4", code: "CS101", time: "09:00 - 11:50", name: "مقدمة في البرمجة", section: "شعبة 3", type: "عملي" },
-        { id: "o5", code: "IC102", time: "12:00 - 12:50", name: "الثقافة الإسلامية", section: "شعبة 4", type: "نظري" },
-      ],
-    },
-    {
-      day: "يوم الثلاثاء",
-      courses: [
-        { id: "o6", code: "CS101", time: "08:00 - 08:50", name: "مقدمة في البرمجة", section: "شعبة 3", type: "نظري" },
-        { id: "o7", code: "MATH201", time: "10:00 - 10:50", name: "تفاضل وتكامل 1", section: "شعبة 1", type: "نظري" },
-        { id: "o8", code: "ENG101", time: "13:00 - 13:50", name: "لغة إنجليزية", section: "شعبة 6", type: "نظري" },
-      ],
-    },
-    {
-      day: "يوم الأربعاء",
-      courses: [
-        { id: "o9", code: "PHYS101", time: "09:00 - 11:50", name: "فيزياء عامة", section: "شعبة 2", type: "عملي" },
-        { id: "o10", code: "MATH201", time: "12:00 - 12:50", name: "تفاضل وتكامل 1", section: "شعبة 1", type: "نظري" },
-      ],
-    },
-    {
-      day: "يوم الخميس",
-      courses: [
-        { id: "o11", code: "ENG101", time: "08:00 - 08:50", name: "لغة إنجليزية", section: "شعبة 6", type: "نظري" },
-        { id: "o12", code: "IC102", time: "10:00 - 10:50", name: "الثقافة الإسلامية", section: "شعبة 4", type: "نظري" },
-      ],
-    },
-  ],
-}
-
-const PROP1_SCHEDULE: Schedule = {
-  id: "prop1",
-  title: "مقترح 1 (95%)",
-  perk: "✨ أوف يوم الخميس",
-  days: [
-    {
-      day: "يوم الأحد",
-      courses: [
-        // CS101 changed from شعبة 3 → شعبة 5 (trigger blue "change")
-        { id: "p1", code: "CS101", time: "08:00 - 08:50", name: "مقدمة في البرمجة", section: "شعبة 5", type: "نظري" },
-        // MATH201 changed from شعبة 1 → شعبة 7 (trigger blue "change")
-        { id: "p2", code: "MATH201", time: "09:00 - 09:50", name: "تفاضل وتكامل 1", section: "شعبة 7", type: "نظري" },
-        { id: "p3", code: "PHYS101", time: "11:00 - 11:50", name: "فيزياء عامة", section: "شعبة 2", type: "نظري" },
-      ],
-    },
-    {
-      day: "يوم الإثنين",
-      courses: [
-        { id: "p4", code: "CS101", time: "09:00 - 11:50", name: "مقدمة في البرمجة", section: "شعبة 5", type: "عملي" },
-        { id: "p5", code: "IC102", time: "12:00 - 12:50", name: "الثقافة الإسلامية", section: "شعبة 4", type: "نظري" },
-      ],
-    },
-    {
-      day: "يوم الثلاثاء",
-      courses: [
-        { id: "p6", code: "CS101", time: "08:00 - 08:50", name: "مقدمة في البرمجة", section: "شعبة 5", type: "نظري" },
-        { id: "p7", code: "MATH201", time: "09:00 - 09:50", name: "تفاضل وتكامل 1", section: "شعبة 7", type: "نظري" },
-        // New course added (trigger green "add")
-        { id: "p8", code: "STAT201", time: "12:00 - 12:50", name: "مبادئ الإحصاء", section: "شعبة 1", type: "نظري" },
-      ],
-    },
-    {
-      day: "يوم الأربعاء",
-      courses: [
-        { id: "p9", code: "PHYS101", time: "09:00 - 11:50", name: "فيزياء عامة", section: "شعبة 2", type: "عملي" },
-        { id: "p10", code: "MATH201", time: "12:00 - 12:50", name: "تفاضل وتكامل 1", section: "شعبة 7", type: "نظري" },
-      ],
-    },
-    // Thursday is FREE — hence the perk "أوف يوم الخميس"
-    // ENG101 dropped entirely (trigger red "delete")
-  ],
-}
-
-const PROP2_SCHEDULE: Schedule = {
-  id: "prop2",
-  title: "مقترح 2 (80%)",
-  perk: "⚡ بدون بريكات طويلة",
-  days: [
-    {
-      day: "يوم الأحد",
-      courses: [
-        { id: "q1", code: "CS101", time: "08:00 - 08:50", name: "مقدمة في البرمجة", section: "شعبة 3", type: "نظري" },
-        { id: "q2", code: "MATH201", time: "09:00 - 09:50", name: "تفاضل وتكامل 1", section: "شعبة 1", type: "نظري" },
-        { id: "q3", code: "PHYS101", time: "10:00 - 10:50", name: "فيزياء عامة", section: "شعبة 2", type: "نظري" },
-      ],
-    },
-    {
-      day: "يوم الإثنين",
-      courses: [
-        { id: "q4", code: "CS101", time: "08:00 - 10:50", name: "مقدمة في البرمجة", section: "شعبة 3", type: "عملي" },
-        { id: "q5", code: "IC102", time: "11:00 - 11:50", name: "الثقافة الإسلامية", section: "شعبة 4", type: "نظري" },
-        { id: "q6", code: "ENG101", time: "12:00 - 12:50", name: "لغة إنجليزية", section: "شعبة 6", type: "نظري" },
-      ],
-    },
-    {
-      day: "يوم الثلاثاء",
-      courses: [
-        { id: "q7", code: "CS101", time: "08:00 - 08:50", name: "مقدمة في البرمجة", section: "شعبة 3", type: "نظري" },
-        { id: "q8", code: "MATH201", time: "09:00 - 09:50", name: "تفاضل وتكامل 1", section: "شعبة 1", type: "نظري" },
-        // ENG101 changed from شعبة 6 → شعبة 2 (trigger blue "change")
-        { id: "q9", code: "ENG101", time: "10:00 - 10:50", name: "لغة إنجليزية", section: "شعبة 2", type: "نظري" },
-      ],
-    },
-    {
-      day: "يوم الأربعاء",
-      courses: [
-        { id: "q10", code: "PHYS101", time: "08:00 - 10:50", name: "فيزياء عامة", section: "شعبة 2", type: "عملي" },
-        { id: "q11", code: "MATH201", time: "11:00 - 11:50", name: "تفاضل وتكامل 1", section: "شعبة 1", type: "نظري" },
-      ],
-    },
-    {
-      day: "يوم الخميس",
-      courses: [
-        { id: "q12", code: "IC102", time: "08:00 - 08:50", name: "الثقافة الإسلامية", section: "شعبة 4", type: "نظري" },
-      ],
-    },
-  ],
-}
-
-const SCHEDULES: Schedule[] = [ORIGINAL_SCHEDULE, PROP1_SCHEDULE, PROP2_SCHEDULE]
 
 // ─── Action Plan Diffing ─────────────────────────────────────────────────────
 
@@ -372,37 +220,100 @@ function findBreaks(
   return breaks
 }
 
-// ─── Color mapping for grid course blocks ────────────────────────────────────
-
-const COURSE_COLORS: Record<string, { bg: string; border: string; text: string }> = {
-  CS101: { bg: "#eef2ff", border: "#c7d2fe", text: "#4338ca" },
-  MATH201: { bg: "#fef3c7", border: "#fde68a", text: "#92400e" },
-  PHYS101: { bg: "#dbeafe", border: "#93c5fd", text: "#1e40af" },
-  IC102: { bg: "#d1fae5", border: "#6ee7b7", text: "#065f46" },
-  ENG101: { bg: "#fce7f3", border: "#f9a8d4", text: "#9d174d" },
-  STAT201: { bg: "#f3e8ff", border: "#d8b4fe", text: "#6b21a8" },
-}
-
-const DEFAULT_COURSE_COLOR = { bg: "#f1f5f9", border: "#cbd5e1", text: "#334155" }
-
 // ─── Component ───────────────────────────────────────────────────────────────
 
 export function SchedulesView() {
-  const [activeTab, setActiveTab] = useState<ScheduleId>("original")
+  const { registeredCourses, suggestions, hasSearched, applySuggestion } = useSchedule()
+  const { showDialog, showError } = useDialog()
+
+  const originalSchedule = useMemo(() => {
+    return toScheduleFromSections(
+      "الجدول الأصلي",
+      "original",
+      "📋 الجدول الحالي بدون تعديل",
+      registeredCourses
+    )
+  }, [registeredCourses])
+
+  const suggestedSchedules = useMemo(() => {
+    return (suggestions || []).map((sug, i) =>
+      toScheduleFromSections(
+        `مقترح ${i + 1} (${sug.score}%)`,
+        sug.id,
+        perkLabel(sug.perks),
+        sug.sections
+      )
+    )
+  }, [suggestions])
+
+  const schedules = useMemo(() => {
+    return [originalSchedule, ...suggestedSchedules]
+  }, [originalSchedule, suggestedSchedules])
+
+  const [activeTab, setActiveTab] = useState<string>("original")
   const [viewMode, setViewMode] = useState<ViewMode>("agenda")
   const [modalVisible, setModalVisible] = useState(false)
+  const [modalSnapshot, setModalSnapshot] = useState<{
+    id: string
+    title: string
+    steps: ActionStep[]
+    warnings: { courseCode: string; prerequisites: string[] }[]
+  } | null>(null)
   const [isFullScreen, setIsFullScreen] = useState(false)
 
-  const currentSchedule = SCHEDULES.find((s) => s.id === activeTab)!
+  /* eslint-disable react-hooks/set-state-in-effect */
+  // Reset to 'original' whenever suggestions list changes
+  useEffect(() => {
+    setActiveTab("original")
+  }, [suggestions])
+
+  // Reset to 'original' if selected schedule disappears
+  useEffect(() => {
+    if (activeTab !== "original" && !schedules.some((s) => s.id === activeTab)) {
+      setActiveTab("original")
+    }
+  }, [schedules, activeTab])
+  /* eslint-enable react-hooks/set-state-in-effect */
+
+  const currentSchedule = schedules.find((s) => s.id === activeTab) ?? originalSchedule
+  const currentSuggestion = suggestions.find((s) => s.id === activeTab)
+  const currentWarnings = currentSuggestion?.prerequisiteWarnings || []
 
   const actionPlan = useMemo(() => {
     if (activeTab === "original") {
-      // For original, show all as "keep"
-      return buildActionPlan(ORIGINAL_SCHEDULE, ORIGINAL_SCHEDULE)
+      return buildActionPlan(originalSchedule, originalSchedule)
     }
-    const proposed = SCHEDULES.find((s) => s.id === activeTab)!
-    return buildActionPlan(ORIGINAL_SCHEDULE, proposed)
-  }, [activeTab])
+    return buildActionPlan(originalSchedule, currentSchedule)
+  }, [activeTab, originalSchedule, currentSchedule])
+
+  const handleOpenActionPlan = () => {
+    if (!currentSuggestion) return
+    setModalSnapshot({
+      id: currentSuggestion.id,
+      title: currentSchedule.title,
+      steps: actionPlan,
+      warnings: currentWarnings,
+    })
+    setModalVisible(true)
+  }
+
+  const handleApply = async (id: string) => {
+    try {
+      await applySuggestion(id)
+    } catch (err: any) {
+      if (err?.status === 404 || err?.code === "NOT_FOUND") {
+        await showDialog({
+          variant: "warning",
+          title: "تنبيه",
+          message:
+            "هذا المقترح لم يعد صالحاً لأن جدولك تغيّر. ابحث عن جداول جديدة",
+        })
+      } else {
+        await showError(err)
+      }
+      throw err
+    }
+  }
 
   // ── Full-screen orientation handling ──
   const toggleFullScreen = useCallback(async () => {
@@ -422,18 +333,22 @@ export function SchedulesView() {
     }
   }, [])
 
+  const hasNoCourses = registeredCourses.length === 0
+  const hasNoSuggestions = suggestions.length === 0
+
   return (
     <View className="flex-1">
       {/* ── Top Navigation – Pill Tabs ── */}
       <ScrollView horizontal showsHorizontalScrollIndicator={false} className="mb-3">
-        {SCHEDULES.map((schedule) => {
+        {schedules.map((schedule) => {
           const isActive = activeTab === schedule.id
           return (
             <TouchableOpacity
               key={schedule.id}
-              onPress={() => setActiveTab(schedule.id as ScheduleId)}
-              className={`mr-3 rounded-full px-5 py-2 ${isActive ? "bg-indigo-600" : "bg-white border border-slate-200"
-                }`}
+              onPress={() => setActiveTab(schedule.id)}
+              className={`mr-3 rounded-full px-5 py-2 ${
+                isActive ? "bg-indigo-600" : "bg-white border border-slate-200"
+              }`}
             >
               <Text
                 style={{ textAlign: "left" }}
@@ -446,103 +361,147 @@ export function SchedulesView() {
         })}
       </ScrollView>
 
-      {/* ── Highlight Badge ── */}
-      <View className="mb-4 self-start rounded-lg bg-amber-100 px-3 py-1.5 flex-row items-center">
-        <Text style={{ textAlign: "left" }} className="pb-1 text-sm font-bold text-amber-800">
-          {currentSchedule.perk}
-        </Text>
-      </View>
-
-      {/* ── View Toggle + Full Screen ── */}
-      <View className="mb-4 flex-row items-center justify-end">
-        {/* Full-screen button (only when grid mode is active) */}
-        {viewMode === "grid" && (
-          <TouchableOpacity
-            onPress={toggleFullScreen}
-            className="mr-3 flex-row items-center rounded-lg bg-slate-100 px-3 py-2"
-          >
-            <Maximize size={16} color={COLORS.slate700} />
-            <Text style={{ textAlign: "left" }} className="mr-1.5 pb-0.5 text-xs font-bold text-slate-700">
-              تكبير الشاشة
-            </Text>
-          </TouchableOpacity>
-        )}
-
-        <TouchableOpacity
-          onPress={() => setViewMode("agenda")}
-          className={`mr-2 rounded-lg p-2 ${viewMode === "agenda" ? "bg-indigo-100" : "bg-white border border-slate-200"
-            }`}
-        >
-          <List size={20} color={viewMode === "agenda" ? COLORS.indigo600 : COLORS.slate400} />
-        </TouchableOpacity>
-        <TouchableOpacity
-          onPress={() => setViewMode("grid")}
-          className={`rounded-lg p-2 ${viewMode === "grid" ? "bg-indigo-100" : "bg-white border border-slate-200"
-            }`}
-        >
-          <LayoutGrid size={20} color={viewMode === "grid" ? COLORS.indigo600 : COLORS.slate400} />
-        </TouchableOpacity>
-      </View>
-
-      {/* ── Schedule Content ── */}
-      {viewMode === "agenda" ? (
-        <AgendaView schedule={currentSchedule} />
-      ) : (
-        <GridView schedule={currentSchedule} />
-      )}
-
-      {/* ── Action Plan Button (hidden for original schedule) ── */}
-      {activeTab !== "original" && (
-        <View className="mt-4 pb-4">
-          <TouchableOpacity
-            onPress={() => setModalVisible(true)}
-            className="rounded-2xl bg-slate-900 py-4 items-center justify-center shadow-sm"
-          >
-            <Text style={{ textAlign: "left" }} className="pb-1 text-base font-bold text-white">
-              أرني خريطة التنفيذ
-            </Text>
-          </TouchableOpacity>
+      {/* ── Special cases banners ── */}
+      {hasNoCourses ? (
+        <View className="mb-4 self-start rounded-lg bg-slate-100 px-3 py-1.5 flex-row items-center">
+          <Text style={{ textAlign: "left" }} className="pb-1 text-sm font-bold text-slate-500">
+            لم تسجّل أي مقرر بعد
+          </Text>
         </View>
-      )}
+      ) : hasNoSuggestions ? (
+        <View className="mb-3 self-start rounded-lg bg-slate-100 px-3 py-1.5 flex-row items-center">
+          <Text style={{ textAlign: "left" }} className="pb-1 text-sm font-bold text-slate-500">
+            {!hasSearched
+              ? "لم تبحث عن جداول مقترحة بعد. اضبط تفضيلاتك ثم اضغط «البحث عن أفضل الجداول» من تبويب التفضيلات"
+              : "لم نجد جداول بديلة تناسب قيودك"}
+          </Text>
+        </View>
+      ) : null}
 
-      {/* ── Action Plan Modal ── */}
-      <ActionPlanModal
-        visible={modalVisible}
-        onClose={() => setModalVisible(false)}
-        steps={actionPlan}
-        scheduleTitle={currentSchedule.title}
-      />
-
-      {/* ── Full-Screen Grid Modal ── */}
-      <Modal
-        visible={isFullScreen}
-        animationType="fade"
-        supportedOrientations={["landscape"]}
-        onRequestClose={toggleFullScreen}
-      >
-        <View className="flex-1 bg-white">
-          <StatusBar hidden />
-          {/* Compact header bar */}
-          <View
-            className="flex-row items-center justify-between px-4 py-2"
-            style={{ backgroundColor: "#f8fafc" }}
-          >
-            <Text style={{ textAlign: "left" }} className="pb-1 text-base font-extrabold text-slate-800">
-              {currentSchedule.title}
-            </Text>
-            <TouchableOpacity
-              onPress={toggleFullScreen}
-              className="flex-row items-center rounded-xl bg-slate-900 px-4 py-2"
-            >
-              <Minimize size={16} color="#fff" />
-              <Text style={{ textAlign: "left" }} className="mr-2 pb-1 text-sm font-bold text-white">
-                تصغير
+      {!hasNoCourses && (
+        <>
+          {/* ── Highlight Badge ── */}
+          {currentSchedule.perk ? (
+            <View className="mb-4 self-start rounded-lg bg-amber-100 px-3 py-1.5 flex-row items-center">
+              <Text style={{ textAlign: "left" }} className="pb-1 text-sm font-bold text-amber-800">
+                {currentSchedule.perk}
               </Text>
+            </View>
+          ) : null}
+
+          {/* ── Prerequisite Warnings Badge for active suggestion ── */}
+          {activeTab !== "original" && currentWarnings.length > 0 && (
+            <View className="mb-3 gap-2">
+              {currentWarnings.map((w, idx) => (
+                <View
+                  key={idx}
+                  className="rounded-xl border border-amber-200 bg-amber-50 p-3"
+                >
+                  <Text
+                    style={{ textAlign: "left" }}
+                    className="pb-0.5 text-xs font-bold text-amber-800 leading-relaxed"
+                  >
+                    {`تنبيه: المقرر ${w.courseCode} يتطلب اجتياز ${w.prerequisites.join("، ")} — تأكد من ذلك قبل التسجيل`}
+                  </Text>
+                </View>
+              ))}
+            </View>
+          )}
+
+          {/* ── View Toggle + Full Screen ── */}
+          <View className="mb-4 flex-row items-center justify-end">
+            {/* Full-screen button (only when grid mode is active) */}
+            {viewMode === "grid" && (
+              <TouchableOpacity
+                onPress={toggleFullScreen}
+                className="mr-3 flex-row items-center rounded-lg bg-slate-100 px-3 py-2"
+              >
+                <Maximize size={16} color={COLORS.slate700} />
+                <Text style={{ textAlign: "left" }} className="mr-1.5 pb-0.5 text-xs font-bold text-slate-700">
+                  تكبير الشاشة
+                </Text>
+              </TouchableOpacity>
+            )}
+
+            <TouchableOpacity
+              onPress={() => setViewMode("agenda")}
+              className={`mr-2 rounded-lg p-2 ${
+                viewMode === "agenda" ? "bg-indigo-100" : "bg-white border border-slate-200"
+              }`}
+            >
+              <List size={20} color={viewMode === "agenda" ? COLORS.indigo600 : COLORS.slate400} />
+            </TouchableOpacity>
+            <TouchableOpacity
+              onPress={() => setViewMode("grid")}
+              className={`rounded-lg p-2 ${
+                viewMode === "grid" ? "bg-indigo-100" : "bg-white border border-slate-200"
+              }`}
+            >
+              <LayoutGrid size={20} color={viewMode === "grid" ? COLORS.indigo600 : COLORS.slate400} />
             </TouchableOpacity>
           </View>
-          <GridView schedule={currentSchedule} />
-        </View>
-      </Modal>
+
+          {/* ── Schedule Content ── */}
+          {viewMode === "agenda" ? (
+            <AgendaView schedule={currentSchedule} />
+          ) : (
+            <GridView schedule={currentSchedule} />
+          )}
+
+          {/* ── Action Plan Button (hidden for original schedule) ── */}
+          {activeTab !== "original" && currentSuggestion && (
+            <View className="mt-4 pb-4">
+              <TouchableOpacity
+                onPress={handleOpenActionPlan}
+                className="rounded-2xl bg-slate-900 py-4 items-center justify-center shadow-sm"
+              >
+                <Text style={{ textAlign: "left" }} className="pb-1 text-base font-bold text-white">
+                  أرني خريطة التنفيذ
+                </Text>
+              </TouchableOpacity>
+            </View>
+          )}
+
+          {/* ── Action Plan Modal ── */}
+          <ActionPlanModal
+            visible={modalVisible}
+            onClose={() => setModalVisible(false)}
+            snapshot={modalSnapshot}
+            onApply={handleApply}
+          />
+
+          {/* ── Full-Screen Grid Modal ── */}
+          <Modal
+            visible={isFullScreen}
+            animationType="fade"
+            supportedOrientations={["landscape"]}
+            onRequestClose={toggleFullScreen}
+          >
+            <View className="flex-1 bg-white">
+              <StatusBar hidden />
+              {/* Compact header bar */}
+              <View
+                className="flex-row items-center justify-between px-4 py-2"
+                style={{ backgroundColor: "#f8fafc" }}
+              >
+                <Text style={{ textAlign: "left" }} className="pb-1 text-base font-extrabold text-slate-800">
+                  {currentSchedule.title}
+                </Text>
+                <TouchableOpacity
+                  onPress={toggleFullScreen}
+                  className="flex-row items-center rounded-xl bg-slate-900 px-4 py-2"
+                >
+                  <Minimize size={16} color="#fff" />
+                  <Text style={{ textAlign: "left" }} className="mr-2 pb-1 text-sm font-bold text-white">
+                    تصغير
+                  </Text>
+                </TouchableOpacity>
+              </View>
+              <GridView schedule={currentSchedule} />
+            </View>
+          </Modal>
+        </>
+      )}
     </View>
   )
 }
@@ -567,7 +526,7 @@ function AgendaView({ schedule }: { schedule: Schedule }) {
 
           {/* Course Cards */}
           {dayData.courses.map((course) => {
-            const colors = COURSE_COLORS[course.code] ?? DEFAULT_COURSE_COLOR
+            const colors = getCourseColor(course.code)
             return (
               <View
                 key={course.id}
@@ -596,10 +555,9 @@ function AgendaView({ schedule }: { schedule: Schedule }) {
                       className="rounded px-1.5 py-0.5"
                       style={{ backgroundColor: colors.bg }}
                     >
-                      {/* ✅ Arabic clipping fix: pb-1 + explicit lineHeight */}
                       <Text
                         style={{ textAlign: "left", color: colors.text, lineHeight: 18 }}
-                        className="pb-1 text-[10px] font-bold"
+                        className="pb-1 text-xs font-semibold"
                       >
                         {course.type}
                       </Text>
@@ -615,10 +573,9 @@ function AgendaView({ schedule }: { schedule: Schedule }) {
   )
 }
 
-// ─── Grid View (True 2D Time Grid with Dynamic Bounds) ───────────────────────
+// ─── Grid View ───────────────────────────────────────────────────────────────
 
 function GridView({ schedule }: { schedule: Schedule }) {
-  // Dynamic bounds — no dead space
   const { startHour, endHour } = useMemo(() => getScheduleBounds(schedule), [schedule])
   const totalHours = endHour - startHour
   const gridContentHeight = totalHours * HOUR_HEIGHT
@@ -758,7 +715,7 @@ function GridView({ schedule }: { schedule: Schedule }) {
 
                   {/* ── Absolutely-positioned course blocks ── */}
                   {courses.map((course) => {
-                    const colors = COURSE_COLORS[course.code] ?? DEFAULT_COURSE_COLOR
+                    const colors = getCourseColor(course.code)
                     const layout = calculateBlockLayout(course.time, startHour)
                     return (
                       <View
@@ -802,7 +759,6 @@ function GridView({ schedule }: { schedule: Schedule }) {
                             {course.section}
                           </Text>
                           <View className="rounded bg-white/60 px-1 py-0.5">
-                            {/* ✅ Arabic clipping fix: pb-1 + explicit lineHeight */}
                             <Text
                               style={{ textAlign: "left", color: colors.text, lineHeight: 18 }}
                               className="pb-1 text-[9px] font-bold"
@@ -828,27 +784,55 @@ function GridView({ schedule }: { schedule: Schedule }) {
 
 type ConfirmStep = "plan" | "confirm" | "success"
 
+interface ActionPlanSnapshot {
+  id: string
+  title: string
+  steps: ActionStep[]
+  warnings: { courseCode: string; prerequisites: string[] }[]
+}
+
 function ActionPlanModal({
   visible,
   onClose,
-  steps,
-  scheduleTitle,
+  snapshot,
+  onApply,
 }: {
   visible: boolean
   onClose: () => void
-  steps: ActionStep[]
-  scheduleTitle: string
+  snapshot: ActionPlanSnapshot | null
+  onApply: (id: string) => Promise<void>
 }) {
   const [confirmStep, setConfirmStep] = useState<ConfirmStep>("plan")
+  const [isApplying, setIsApplying] = useState(false)
 
+  /* eslint-disable react-hooks/set-state-in-effect */
   // Reset to 'plan' whenever the modal opens
   useEffect(() => {
-    if (visible) setConfirmStep("plan")
+    if (visible) {
+      setConfirmStep("plan")
+      setIsApplying(false)
+    }
   }, [visible])
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   const handleClose = () => {
     setConfirmStep("plan")
+    setIsApplying(false)
     onClose()
+  }
+
+  if (!snapshot) return null
+
+  const handleConfirmApply = async () => {
+    setIsApplying(true)
+    try {
+      await onApply(snapshot.id)
+      setConfirmStep("success")
+    } catch {
+      handleClose()
+    } finally {
+      setIsApplying(false)
+    }
   }
 
   return (
@@ -868,9 +852,28 @@ function ActionPlanModal({
                   <X size={20} color={COLORS.slate600} />
                 </TouchableOpacity>
               </View>
-              <Text style={{ textAlign: "left" }} className="pb-1 mb-5 text-sm text-slate-400">
-                الانتقال من الجدول الأصلي ← {scheduleTitle}
+              <Text style={{ textAlign: "left" }} className="pb-1 mb-4 text-sm text-slate-400">
+                الانتقال من الجدول الأصلي ← {snapshot.title}
               </Text>
+
+              {/* Prerequisite Warnings */}
+              {snapshot.warnings && snapshot.warnings.length > 0 && (
+                <View className="mb-4 gap-2">
+                  {snapshot.warnings.map((w, idx) => (
+                    <View
+                      key={idx}
+                      className="rounded-xl border border-amber-200 bg-amber-50 p-3"
+                    >
+                      <Text
+                        style={{ textAlign: "left" }}
+                        className="pb-0.5 text-xs font-bold text-amber-800 leading-relaxed"
+                      >
+                        {`تنبيه: المقرر ${w.courseCode} يتطلب اجتياز ${w.prerequisites.join("، ")} — تأكد من ذلك قبل التسجيل`}
+                      </Text>
+                    </View>
+                  ))}
+                </View>
+              )}
 
               {/* Legend */}
               <View className="mb-5 flex-row flex-wrap items-center gap-3">
@@ -882,7 +885,7 @@ function ActionPlanModal({
 
               {/* Steps */}
               <ScrollView showsVerticalScrollIndicator={false}>
-                {steps.map((action, idx) => {
+                {snapshot.steps.map((action, idx) => {
                   const theme = ACTION_THEMES[action.type]
                   const Icon = theme.icon
                   return (
@@ -927,15 +930,23 @@ function ActionPlanModal({
               </Text>
 
               <TouchableOpacity
-                onPress={() => setConfirmStep("success")}
-                className="mb-3 w-full rounded-2xl bg-indigo-600 py-4 items-center justify-center shadow-sm"
+                disabled={isApplying}
+                onPress={handleConfirmApply}
+                className={`mb-3 w-full rounded-2xl py-4 items-center justify-center shadow-sm ${
+                  isApplying ? "bg-indigo-400" : "bg-indigo-600"
+                }`}
               >
-                <Text style={{ textAlign: "left" }} className="pb-1 text-base font-bold text-white">
-                  نعم، متأكد
-                </Text>
+                {isApplying ? (
+                  <ActivityIndicator size="small" color="#ffffff" />
+                ) : (
+                  <Text style={{ textAlign: "left" }} className="pb-1 text-base font-bold text-white">
+                    نعم، متأكد
+                  </Text>
+                )}
               </TouchableOpacity>
 
               <TouchableOpacity
+                disabled={isApplying}
                 onPress={() => setConfirmStep("plan")}
                 className="w-full rounded-2xl bg-slate-100 py-4 items-center justify-center"
               >
@@ -962,7 +973,7 @@ function ActionPlanModal({
                 style={{ textAlign: "center" }}
                 className="pb-1 text-sm text-slate-400 mb-8"
               >
-                {scheduleTitle}
+                {snapshot.title}
               </Text>
 
               <TouchableOpacity

@@ -4,6 +4,8 @@ export type ApiDay = "SUN" | "MON" | "TUE" | "WED" | "THU";
 export type ApiSectionType = "THEORY" | "PRACTICAL";
 export type ApiSectionMode = "ONSITE" | "REMOTE";
 export type ApiSectionStatus = "OPEN" | "CLOSED";
+export type ApiPreferredTime = "MORNING" | "EVENING" | "ANY";
+export type ApiScheduleDensity = "COMPACT" | "RELAXED";
 
 export interface ApiSession {
   id: string;
@@ -34,6 +36,32 @@ export interface ApiSchedule {
   sections: (ApiSection & { locked: boolean })[];
 }
 
+export interface ApiPreferences {
+  preferredTime: ApiPreferredTime;
+  offDays: ApiDay[];
+  density: ApiScheduleDensity;
+  maxBreakMinutes: number | null;
+  maxCredits: number;
+  blockedTimes: { id?: string; startTime: string; endTime: string }[];
+}
+
+export interface ApiSuggestion {
+  id: string;
+  score: number;
+  perks: string[];
+  totalCredits: number;
+  changes: {
+    added: string[];
+    dropped: string[];
+    swapped: string[];
+  };
+  prerequisiteWarnings: {
+    courseCode: string;
+    prerequisites: string[];
+  }[];
+  sections: (ApiSection & { locked: boolean })[];
+}
+
 export interface ApiSectionBody {
   name: string;
   code: string;
@@ -49,6 +77,28 @@ export interface ApiSectionBody {
     endTime: string;
   }[];
 }
+
+export const PREFERRED_TIME_UI_TO_API: Record<string, ApiPreferredTime> = {
+  "صباحي": "MORNING",
+  "مسائي": "EVENING",
+  "مرن": "ANY",
+};
+
+export const PREFERRED_TIME_API_TO_UI: Record<ApiPreferredTime, "صباحي" | "مسائي" | "مرن"> = {
+  MORNING: "صباحي",
+  EVENING: "مسائي",
+  ANY: "مرن",
+};
+
+export const DENSITY_UI_TO_API: Record<string, ApiScheduleDensity> = {
+  "مضغوط": "COMPACT",
+  "مريح": "RELAXED",
+};
+
+export const DENSITY_API_TO_UI: Record<ApiScheduleDensity, "مضغوط" | "مريح"> = {
+  COMPACT: "مضغوط",
+  RELAXED: "مريح",
+};
 
 export const DAY_MAP_API_TO_UI: Record<ApiDay, string> = {
   SUN: "الأحد",
@@ -138,6 +188,40 @@ export function toApiTime(uiTime: string): string {
 
   return clean;
 }
+export function toApiTimeLoose(input: string): string | null {
+  if (!input) return null;
+  const clean = input.trim();
+
+  // 12-hour format with ص/م: e.g. "08:30 ص", "8:30 ص", "12:00 م", "01:00 م", "1:00 م"
+  const match12 = clean.match(/^(\d{1,2}):(\d{2})\s*(ص|م)$/);
+  if (match12) {
+    let h = parseInt(match12[1], 10);
+    const m = parseInt(match12[2], 10);
+    const period = match12[3];
+    if (h < 1 || h > 12 || m < 0 || m > 59) return null;
+    if (period === "ص") {
+      if (h === 12) h = 0;
+    } else if (period === "م") {
+      if (h !== 12) h += 12;
+    }
+    return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
+  }
+
+  // 24-hour format: e.g. "08:30", "8:30", "13:00", "00:00"
+  const match24 = clean.match(/^(\d{1,2}):(\d{2})$/);
+  if (match24) {
+    const h = parseInt(match24[1], 10);
+    const m = parseInt(match24[2], 10);
+    if (h < 0 || h > 23 || m < 0 || m > 59) return null;
+    return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
+  }
+
+  return null;
+}
+
+export function toUiTimeFrom24(value: string): string {
+  return toUiTime(value);
+}
 
 export const COURSE_COLORS = [
   "bg-sky-500",
@@ -152,7 +236,38 @@ export const COURSE_COLORS = [
   "bg-cyan-500",
 ];
 
-export function getCourseColor(code: string): string {
+export interface CourseColorStyle {
+  bg: string;
+  border: string;
+  text: string;
+}
+
+export const COURSE_COLOR_STYLES: CourseColorStyle[] = [
+  { bg: "#eef2ff", border: "#c7d2fe", text: "#4338ca" }, // indigo
+  { bg: "#fef3c7", border: "#fde68a", text: "#92400e" }, // amber
+  { bg: "#dbeafe", border: "#93c5fd", text: "#1e40af" }, // blue
+  { bg: "#d1fae5", border: "#6ee7b7", text: "#065f46" }, // emerald
+  { bg: "#fce7f3", border: "#f9a8d4", text: "#9d174d" }, // pink
+  { bg: "#f3e8ff", border: "#d8b4fe", text: "#6b21a8" }, // purple
+  { bg: "#e0f2fe", border: "#bae6fd", text: "#0369a1" }, // sky
+  { bg: "#ccfbf1", border: "#99f6e4", text: "#0f766e" }, // teal
+  { bg: "#ffedd5", border: "#fed7aa", text: "#c2410c" }, // orange
+  { bg: "#cffafe", border: "#a5f3fc", text: "#0e7490" }, // cyan
+];
+
+export const DEFAULT_COURSE_COLOR: CourseColorStyle = {
+  bg: "#f1f5f9",
+  border: "#cbd5e1",
+  text: "#334155",
+};
+
+export function getCourseColor(code: string): CourseColorStyle {
+  if (!code) return DEFAULT_COURSE_COLOR;
+  const sum = code.split("").reduce((acc, char) => acc + char.charCodeAt(0), 0);
+  return COURSE_COLOR_STYLES[Math.abs(sum) % COURSE_COLOR_STYLES.length];
+}
+
+export function getCourseTailwindColor(code: string): string {
   const sum = (code || "").split("").reduce((acc, char) => acc + char.charCodeAt(0), 0);
   return COURSE_COLORS[Math.abs(sum) % COURSE_COLORS.length];
 }
@@ -184,7 +299,7 @@ export function toRegisteredCourse(api: ApiSection & { locked?: boolean }): Regi
     code: api.code,
     credits: api.credits,
     section: api.section,
-    color: getCourseColor(api.code),
+    color: getCourseTailwindColor(api.code),
     type: api.type === "THEORY" ? "نظري" : "عملي",
     mode: api.mode === "ONSITE" ? "حضوري" : "عن بعد",
     instructor: api.instructor ?? "",
@@ -196,6 +311,119 @@ export function toRegisteredCourse(api: ApiSection & { locked?: boolean }): Regi
     })),
     locked: !!api.locked,
   };
+}
+
+export interface CourseEntry {
+  id: string;
+  code: string;
+  time: string;
+  name: string;
+  section: string;
+  type: string;
+}
+
+export interface DaySchedule {
+  day: string;
+  courses: CourseEntry[];
+}
+
+export interface Schedule {
+  id: string;
+  title: string;
+  perk: string;
+  days: DaySchedule[];
+}
+
+export const ALL_SCHEDULE_DAYS = [
+  "يوم الأحد",
+  "يوم الإثنين",
+  "يوم الثلاثاء",
+  "يوم الأربعاء",
+  "يوم الخميس",
+] as const;
+
+export function toScheduleFromSections(
+  title: string,
+  id: string,
+  perk: string,
+  sections: (ApiSection & { locked?: boolean })[] | RegisteredCourse[]
+): Schedule {
+  const dayBuckets = new Map<string, CourseEntry[]>();
+  for (const d of ALL_SCHEDULE_DAYS) {
+    dayBuckets.set(d, []);
+  }
+
+  for (const sec of sections || []) {
+    const secType =
+      sec.type === "عملي" || sec.type === "PRACTICAL" ? "عملي" : "نظري";
+
+    for (const sess of sec.sessions || []) {
+      let dayName = "";
+      if (sess.day.startsWith("يوم ")) {
+        dayName = sess.day;
+      } else {
+        const uiDay = apiDayToUiDay(sess.day as ApiDay);
+        dayName = `يوم ${uiDay}`;
+      }
+
+      if (!dayBuckets.has(dayName)) {
+        continue;
+      }
+
+      const start24 = toApiTime(sess.startTime);
+      const end24 = toApiTime(sess.endTime);
+
+      const entry: CourseEntry = {
+        id: `${sec.id}-${sess.id}`,
+        code: sec.code,
+        time: `${start24} - ${end24}`,
+        name: sec.name,
+        section: sec.section,
+        type: secType,
+      };
+
+      dayBuckets.get(dayName)!.push(entry);
+    }
+  }
+
+  const days: DaySchedule[] = [];
+  for (const d of ALL_SCHEDULE_DAYS) {
+    const list = dayBuckets.get(d)!;
+    if (list.length > 0) {
+      list.sort((a, b) => {
+        const [aH, aM] = a.time.split("-")[0].trim().split(":").map(Number);
+        const [bH, bM] = b.time.split("-")[0].trim().split(":").map(Number);
+        return (aH * 60 + aM) - (bH * 60 + bM);
+      });
+      days.push({ day: d, courses: list });
+    }
+  }
+
+  return {
+    id,
+    title,
+    perk,
+    days,
+  };
+}
+
+export function perkLabel(perks: string[]): string {
+  const map: Record<string, string> = {
+    OFF_SUN: "✨ أوف يوم الأحد",
+    OFF_MON: "✨ أوف يوم الإثنين",
+    OFF_TUE: "✨ أوف يوم الثلاثاء",
+    OFF_WED: "✨ أوف يوم الأربعاء",
+    OFF_THU: "✨ أوف يوم الخميس",
+    MORNING: "🌅 دوام صباحي",
+    EVENING: "🌙 دوام مسائي",
+    NO_LONG_BREAKS: "⚡ بدون بريكات طويلة",
+    COMPACT: "📦 جدول مضغوط",
+  };
+  const labels = (perks || []).map((p) => map[p] || p).filter(Boolean);
+  if (labels.length === 0) {
+    return "جدول بديل مناسب لقيودك";
+  }
+  return labels.slice(0, 3).join(" • ");
 }
 
 export function toApiSectionBody(data: {

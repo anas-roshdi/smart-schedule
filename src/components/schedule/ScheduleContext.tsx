@@ -13,6 +13,8 @@ import {
   toOfferedSection,
   toRegisteredCourse,
   toApiSectionBody,
+  ApiPreferences,
+  ApiSuggestion,
 } from "../../lib/mappers";
 import {
   fetchSections,
@@ -24,17 +26,29 @@ import {
   registerSectionApi,
   unregisterSectionApi,
   setCourseLockApi,
+  fetchPreferences,
+  savePreferencesApi,
+  generateApi,
+  fetchSuggestions,
+  applySuggestionApi,
 } from "../../lib/schedule-api";
 
 interface ScheduleContextType {
   registeredCourses: RegisteredCourse[];
   offeredSections: OfferedSection[];
+  preferences: ApiPreferences | null;
+  suggestions: ApiSuggestion[];
+  hasSearched: boolean;
+  isGenerating: boolean;
   maxCredits: number;
-  setMaxCredits: (n: number) => void;
   totalCredits: number;
   isLoading: boolean;
   loadError: string | null;
   reload: () => Promise<void>;
+  savePreferences: (body: ApiPreferences) => Promise<void>;
+  generateSuggestions: () => Promise<{ suggestions: ApiSuggestion[]; truncated: boolean }>;
+  applySuggestion: (id: string) => Promise<void>;
+  clearSuggestionsLocally: () => void;
   addCourse: (course: any) => Promise<void>;
   updateCourse: (id: string, course: any) => Promise<void>;
   deleteCourse: (id: string) => Promise<void>;
@@ -62,10 +76,19 @@ const ScheduleContext = createContext<ScheduleContextType | undefined>(
 export function ScheduleProvider({ children }: { children: ReactNode }) {
   const [courses, setCourses] = useState<RegisteredCourse[]>([]);
   const [offered, setOffered] = useState<OfferedSection[]>([]);
+  const [preferences, setPreferences] = useState<ApiPreferences | null>(null);
+  const [suggestions, setSuggestions] = useState<ApiSuggestion[]>([]);
+  const [hasSearched, setHasSearched] = useState<boolean>(false);
+  const [isGenerating, setIsGenerating] = useState<boolean>(false);
   const [maxCredits, setMaxCredits] = useState<number>(18);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [loadError, setLoadError] = useState<string | null>(null);
   const initialLoadDoneRef = useRef<boolean>(false);
+
+  const clearSuggestionsLocally = useCallback(() => {
+    setSuggestions([]);
+    setHasSearched(false);
+  }, []);
 
   const reload = useCallback(async () => {
     const isFirstLoad = !initialLoadDoneRef.current;
@@ -74,13 +97,20 @@ export function ScheduleProvider({ children }: { children: ReactNode }) {
       setLoadError(null);
     }
     try {
-      const [sectionsRes, scheduleRes] = await Promise.all([
+      const [sectionsRes, scheduleRes, prefsRes, suggsRes] = await Promise.all([
         fetchSections(),
         fetchOriginal(),
+        fetchPreferences(),
+        fetchSuggestions(),
       ]);
       setOffered(sectionsRes.sections.map(toOfferedSection));
       setCourses(scheduleRes.schedule.sections.map(toRegisteredCourse));
-      if (typeof scheduleRes.schedule.maxCredits === "number") {
+      setPreferences(prefsRes.preferences);
+      setSuggestions(suggsRes.suggestions);
+      setHasSearched(false);
+      if (typeof prefsRes.preferences?.maxCredits === "number") {
+        setMaxCredits(prefsRes.preferences.maxCredits);
+      } else if (typeof scheduleRes.schedule.maxCredits === "number") {
         setMaxCredits(scheduleRes.schedule.maxCredits);
       }
       initialLoadDoneRef.current = true;
@@ -100,6 +130,7 @@ export function ScheduleProvider({ children }: { children: ReactNode }) {
   }, []);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     reload().catch(() => {});
   }, [reload]);
 
@@ -162,6 +193,7 @@ export function ScheduleProvider({ children }: { children: ReactNode }) {
       if (typeof regRes.schedule.maxCredits === "number") {
         setMaxCredits(regRes.schedule.maxCredits);
       }
+      clearSuggestionsLocally();
       if (newlyCreated) {
         fetchSections()
           .then((secRes) => setOffered(secRes.sections.map(toOfferedSection)))
@@ -181,6 +213,7 @@ export function ScheduleProvider({ children }: { children: ReactNode }) {
   const updateCourse = async (id: string, updatedData: any) => {
     await updateSection(id, toApiSectionBody(updatedData));
     await reload();
+    clearSuggestionsLocally();
   };
 
   const deleteCourse = async (id: string) => {
@@ -189,21 +222,25 @@ export function ScheduleProvider({ children }: { children: ReactNode }) {
     if (typeof res.schedule.maxCredits === "number") {
       setMaxCredits(res.schedule.maxCredits);
     }
+    clearSuggestionsLocally();
   };
 
   const addOfferedSection = async (data: any) => {
     await createSection(toApiSectionBody(data));
     await reload();
+    clearSuggestionsLocally();
   };
 
   const updateOfferedSection = async (id: string, updatedData: any) => {
     await updateSection(id, toApiSectionBody(updatedData));
     await reload();
+    clearSuggestionsLocally();
   };
 
   const deleteOfferedSection = async (id: string) => {
     await removeSection(id);
     setOffered((prev) => prev.filter((s) => s.id !== id));
+    clearSuggestionsLocally();
   };
 
   const sectionStatusReqSeq = useRef<Map<string, number>>(new Map());
@@ -228,6 +265,7 @@ export function ScheduleProvider({ children }: { children: ReactNode }) {
       if (sectionStatusReqSeq.current.get(id) === nextSeq) {
         const updated = toOfferedSection(res.section);
         setOffered((prev) => prev.map((s) => (s.id === id ? updated : s)));
+        clearSuggestionsLocally();
       }
     } catch (err) {
       if (sectionStatusReqSeq.current.get(id) === nextSeq) {
@@ -246,6 +284,7 @@ export function ScheduleProvider({ children }: { children: ReactNode }) {
     if (typeof res.schedule.maxCredits === "number") {
       setMaxCredits(res.schedule.maxCredits);
     }
+    clearSuggestionsLocally();
   };
 
   const toggleCourseLock = async (code: string) => {
@@ -272,6 +311,7 @@ export function ScheduleProvider({ children }: { children: ReactNode }) {
       const res = await setCourseLockApi(code, newLocked);
       if (courseLockReqSeq.current.get(normalizedCode) === nextSeq) {
         setCourses(res.schedule.sections.map(toRegisteredCourse));
+        clearSuggestionsLocally();
       }
     } catch (err) {
       if (courseLockReqSeq.current.get(normalizedCode) === nextSeq) {
@@ -279,6 +319,36 @@ export function ScheduleProvider({ children }: { children: ReactNode }) {
       }
       throw err;
     }
+  };
+
+  const savePreferences = async (body: ApiPreferences) => {
+    const res = await savePreferencesApi(body);
+    setPreferences(res.preferences);
+    if (typeof res.preferences?.maxCredits === "number") {
+      setMaxCredits(res.preferences.maxCredits);
+    }
+    clearSuggestionsLocally();
+  };
+
+  const generateSuggestions = async () => {
+    setIsGenerating(true);
+    try {
+      const res = await generateApi();
+      setSuggestions(res.suggestions);
+      setHasSearched(true);
+      return res;
+    } finally {
+      setIsGenerating(false);
+    }
+  };
+
+  const applySuggestion = async (id: string) => {
+    const res = await applySuggestionApi(id);
+    setCourses(res.schedule.sections.map(toRegisteredCourse));
+    if (typeof res.schedule.maxCredits === "number") {
+      setMaxCredits(res.schedule.maxCredits);
+    }
+    clearSuggestionsLocally();
   };
 
   const isCourseLocked = (code: string) => {
@@ -330,12 +400,19 @@ export function ScheduleProvider({ children }: { children: ReactNode }) {
       value={{
         registeredCourses: courses,
         offeredSections: offered,
+        preferences,
+        suggestions,
+        hasSearched,
+        isGenerating,
         maxCredits,
-        setMaxCredits,
         totalCredits,
         isLoading,
         loadError,
         reload,
+        savePreferences,
+        generateSuggestions,
+        applySuggestion,
+        clearSuggestionsLocally,
         addCourse,
         updateCourse,
         deleteCourse,

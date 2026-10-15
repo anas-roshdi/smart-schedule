@@ -35,6 +35,7 @@ export interface RequestOptions {
   method?: string;
   body?: unknown;
   auth?: boolean;
+  timeoutMs?: number;
 }
 
 export async function request<T>(path: string, options?: RequestOptions): Promise<T> {
@@ -55,7 +56,8 @@ export async function request<T>(path: string, options?: RequestOptions): Promis
   }
 
   const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 15000);
+  const timeoutMs = options?.timeoutMs ?? 15000;
+  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
 
   try {
     const response = await fetch(url, {

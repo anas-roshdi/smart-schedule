@@ -9,7 +9,7 @@ import {
   User,
   type LucideIcon,
 } from "lucide-react-native"
-import { useState } from "react"
+import { useState, useRef } from "react"
 import {
   Modal,
   ScrollView,
@@ -52,6 +52,7 @@ function SchedulePlannerContent() {
   const [activeNav, setActiveNav] = useState<string>("registered")
   const [isProfileMenuVisible, setIsProfileMenuVisible] = useState(false)
   const [isEditProfileVisible, setIsEditProfileVisible] = useState(false)
+  const mainScrollRef = useRef<ScrollView>(null)
 
   return (
     <SafeAreaView className="flex-1 bg-slate-50" edges={["top", "bottom"]}>
@@ -169,6 +170,7 @@ function SchedulePlannerContent() {
         </View>
       ) : (
         <ScrollView
+          ref={mainScrollRef}
           className="flex-1"
           contentContainerClassName="px-5 py-4"
           keyboardShouldPersistTaps="handled"
@@ -179,7 +181,15 @@ function SchedulePlannerContent() {
           ) : tab === "offered" ? (
             <OfferedCourses />
           ) : tab === "preferences" ? (
-            <Preferences />
+            <Preferences
+              onGenerated={() => {
+                setTab("schedules");
+                setActiveNav("schedules");
+              }}
+              onScrollToTop={() => {
+                mainScrollRef.current?.scrollTo({ y: 0, animated: true });
+              }}
+            />
           ) : (
             <SchedulesView />
           )}
