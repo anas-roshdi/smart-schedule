@@ -26,6 +26,7 @@ export interface ApiSection {
   instructor: string | null;
   room: string | null;
   sessions: ApiSession[];
+  prerequisites?: string[];
 }
 
 export interface ApiSchedule {
@@ -76,6 +77,7 @@ export interface ApiSectionBody {
     startTime: string;
     endTime: string;
   }[];
+  prerequisites?: string[];
 }
 
 export const PREFERRED_TIME_UI_TO_API: Record<string, ApiPreferredTime> = {
@@ -289,6 +291,7 @@ export function toOfferedSection(api: ApiSection): OfferedSection {
       startTime: toUiTime(s.startTime),
       endTime: toUiTime(s.endTime),
     })),
+    prerequisites: api.prerequisites || [],
   };
 }
 
@@ -310,6 +313,7 @@ export function toRegisteredCourse(api: ApiSection & { locked?: boolean }): Regi
       endTime: toUiTime(s.endTime),
     })),
     locked: !!api.locked,
+    prerequisites: api.prerequisites || [],
   };
 }
 
@@ -436,6 +440,7 @@ export function toApiSectionBody(data: {
   status?: "open" | "closed" | ApiSectionStatus;
   instructor?: string | null;
   sessions: Session[] | ApiSession[];
+  prerequisites?: string[];
 }): ApiSectionBody {
   const trimmedInstructor = data.instructor ? data.instructor.trim() : "";
   const body: ApiSectionBody = {
@@ -450,6 +455,7 @@ export function toApiSectionBody(data: {
       startTime: toApiTime(s.startTime),
       endTime: toApiTime(s.endTime),
     })),
+    prerequisites: Array.isArray(data.prerequisites) ? data.prerequisites : [],
   };
 
   if (trimmedInstructor.length > 0) {

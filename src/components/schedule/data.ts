@@ -17,6 +17,7 @@ export type RegisteredCourse = {
   instructor: string
   sessions: Session[]
   locked: boolean
+  prerequisites: string[]
 }
 
 export type OfferedSection = {
@@ -30,4 +31,5 @@ export type OfferedSection = {
   mode: "حضوري" | "عن بعد"
   instructor: string
   sessions: Session[]
+  prerequisites: string[]
 }

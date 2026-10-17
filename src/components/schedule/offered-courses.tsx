@@ -22,6 +22,7 @@ import { OfferedSection } from "./data"
 import { useSchedule } from "./ScheduleContext"
 import { CourseFormModal } from "./CourseFormModal"
 import { useDialog } from "../ui/dialog-provider"
+import { formatPrerequisiteWarningMessage } from "../../lib/schedule-api"
 
 export function OfferedCourses() {
   const {
@@ -309,7 +310,14 @@ function OfferedSectionCard({
     if (isRegistering) return
     setIsRegistering(true)
     try {
-      await registerSection(section.id)
+      const warning = await registerSection(section.id)
+      if (warning) {
+        showDialog({
+          variant: "warning",
+          title: "تنبيه المتطلبات السابقة",
+          message: formatPrerequisiteWarningMessage(warning),
+        })
+      }
     } catch (err: any) {
       handleRegisterError(err)
     } finally {
@@ -321,7 +329,14 @@ function OfferedSectionCard({
     setAlertModal(null)
     setIsRegistering(true)
     try {
-      await registerSection(section.id, { replace: true })
+      const warning = await registerSection(section.id, { replace: true })
+      if (warning) {
+        showDialog({
+          variant: "warning",
+          title: "تنبيه المتطلبات السابقة",
+          message: formatPrerequisiteWarningMessage(warning),
+        })
+      }
     } catch (err: any) {
       handleRegisterError(err)
     } finally {
@@ -375,6 +390,13 @@ function OfferedSectionCard({
                 {section.credits} {section.credits === 1 ? "ساعة" : "ساعات"}
               </Text>
             </View>
+            {section.prerequisites && section.prerequisites.length > 0 && (
+              <View className="rounded bg-slate-100 px-1.5 py-0.5">
+                <Text className="text-[10px] font-bold text-slate-600 leading-relaxed">
+                  {`يتطلب: ${section.prerequisites.join("، ")}`}
+                </Text>
+              </View>
+            )}
           </View>
         </View>
         <View className="flex-row items-center gap-2">

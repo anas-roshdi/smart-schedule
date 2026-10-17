@@ -7,6 +7,20 @@ import {
   ApiSuggestion,
 } from "./mappers";
 
+export interface PrerequisiteWarning {
+  courseCode: string;
+  prerequisites: string[];
+  inSchedule: string[];
+}
+
+export function formatPrerequisiteWarningMessage(warning: PrerequisiteWarning): string {
+  let msg = `المقرر ${warning.courseCode} يتطلب اجتياز: ${warning.prerequisites.join("، ")}. تأكد من اجتيازها قبل اعتماد التسجيل في بوابة الجامعة.`;
+  if (warning.inSchedule && warning.inSchedule.length > 0) {
+    msg += `\nملاحظة: ${warning.inSchedule.join("، ")} مسجل في جدولك لهذا الفصل، أي أنك لم تجتزه بعد.`;
+  }
+  return msg;
+}
+
 export async function fetchSections(): Promise<{ sections: ApiSection[] }> {
   return request<{ sections: ApiSection[] }>("/api/sections", {
     method: "GET",
@@ -58,12 +72,18 @@ export async function fetchOriginal(): Promise<{ schedule: ApiSchedule }> {
 export async function registerSectionApi(
   sectionId: string,
   replace?: boolean
-): Promise<{ schedule: ApiSchedule }> {
+): Promise<{
+  schedule: ApiSchedule;
+  prerequisiteWarning: PrerequisiteWarning | null;
+}> {
   const body: { sectionId: string; replace?: boolean } = { sectionId };
   if (replace !== undefined) {
     body.replace = replace;
   }
-  return request<{ schedule: ApiSchedule }>("/api/schedules/original/sections", {
+  return request<{
+    schedule: ApiSchedule;
+    prerequisiteWarning: PrerequisiteWarning | null;
+  }>("/api/schedules/original/sections", {
     method: "POST",
     body,
     auth: true,
@@ -123,8 +143,15 @@ export async function savePreferencesApi(
 export async function generateApi(): Promise<{
   suggestions: ApiSuggestion[];
   truncated: boolean;
+  originalScore: number;
+  originalBlockedCourses: string[];
 }> {
-  return request<{ suggestions: ApiSuggestion[]; truncated: boolean }>(
+  return request<{
+    suggestions: ApiSuggestion[];
+    truncated: boolean;
+    originalScore: number;
+    originalBlockedCourses: string[];
+  }>(
     "/api/schedules/generate",
     {
       method: "POST",
@@ -135,8 +162,16 @@ export async function generateApi(): Promise<{
   );
 }
 
-export async function fetchSuggestions(): Promise<{ suggestions: ApiSuggestion[] }> {
-  return request<{ suggestions: ApiSuggestion[] }>("/api/schedules/suggestions", {
+export async function fetchSuggestions(): Promise<{
+  suggestions: ApiSuggestion[];
+  originalScore: number | null;
+  originalBlockedCourses: string[];
+}> {
+  return request<{
+    suggestions: ApiSuggestion[];
+    originalScore: number | null;
+    originalBlockedCourses: string[];
+  }>("/api/schedules/suggestions", {
     method: "GET",
     auth: true,
   });

@@ -18,6 +18,7 @@ import {
 } from "../../lib/mappers";
 import {
   fetchSections,
+  PrerequisiteWarning,
   createSection,
   updateSection,
   patchSectionStatus,
@@ -38,6 +39,8 @@ interface ScheduleContextType {
   offeredSections: OfferedSection[];
   preferences: ApiPreferences | null;
   suggestions: ApiSuggestion[];
+  originalScore: number | null;
+  originalBlockedCourses: string[];
   hasSearched: boolean;
   isGenerating: boolean;
   maxCredits: number;
@@ -46,10 +49,15 @@ interface ScheduleContextType {
   loadError: string | null;
   reload: () => Promise<void>;
   savePreferences: (body: ApiPreferences) => Promise<void>;
-  generateSuggestions: () => Promise<{ suggestions: ApiSuggestion[]; truncated: boolean }>;
+  generateSuggestions: () => Promise<{
+    suggestions: ApiSuggestion[];
+    truncated: boolean;
+    originalScore: number;
+    originalBlockedCourses: string[];
+  }>;
   applySuggestion: (id: string) => Promise<void>;
   clearSuggestionsLocally: () => void;
-  addCourse: (course: any) => Promise<void>;
+  addCourse: (course: any) => Promise<PrerequisiteWarning | null>;
   updateCourse: (id: string, course: any) => Promise<void>;
   deleteCourse: (id: string) => Promise<void>;
   addOfferedSection: (section: any) => Promise<void>;
@@ -59,7 +67,7 @@ interface ScheduleContextType {
   registerSection: (
     sectionId: string,
     opts?: { replace?: boolean }
-  ) => Promise<void>;
+  ) => Promise<PrerequisiteWarning | null>;
   toggleCourseLock: (code: string) => Promise<void>;
   isCourseLocked: (code: string) => boolean;
   checkConflict: (sessions: Session[]) => boolean;
@@ -78,6 +86,8 @@ export function ScheduleProvider({ children }: { children: ReactNode }) {
   const [offered, setOffered] = useState<OfferedSection[]>([]);
   const [preferences, setPreferences] = useState<ApiPreferences | null>(null);
   const [suggestions, setSuggestions] = useState<ApiSuggestion[]>([]);
+  const [originalScore, setOriginalScore] = useState<number | null>(null);
+  const [originalBlockedCourses, setOriginalBlockedCourses] = useState<string[]>([]);
   const [hasSearched, setHasSearched] = useState<boolean>(false);
   const [isGenerating, setIsGenerating] = useState<boolean>(false);
   const [maxCredits, setMaxCredits] = useState<number>(18);
@@ -88,6 +98,8 @@ export function ScheduleProvider({ children }: { children: ReactNode }) {
   const clearSuggestionsLocally = useCallback(() => {
     setSuggestions([]);
     setHasSearched(false);
+    setOriginalScore(null);
+    setOriginalBlockedCourses([]);
   }, []);
 
   const reload = useCallback(async () => {
@@ -107,6 +119,8 @@ export function ScheduleProvider({ children }: { children: ReactNode }) {
       setCourses(scheduleRes.schedule.sections.map(toRegisteredCourse));
       setPreferences(prefsRes.preferences);
       setSuggestions(suggsRes.suggestions);
+      setOriginalScore(suggsRes.originalScore ?? null);
+      setOriginalBlockedCourses(suggsRes.originalBlockedCourses || []);
       setHasSearched(false);
       if (typeof prefsRes.preferences?.maxCredits === "number") {
         setMaxCredits(prefsRes.preferences.maxCredits);
@@ -199,6 +213,7 @@ export function ScheduleProvider({ children }: { children: ReactNode }) {
           .then((secRes) => setOffered(secRes.sections.map(toOfferedSection)))
           .catch(() => {});
       }
+      return regRes.prerequisiteWarning ?? null;
     } catch (err: any) {
       if (newlyCreated) {
         try {
@@ -278,13 +293,14 @@ export function ScheduleProvider({ children }: { children: ReactNode }) {
   const registerSection = async (
     sectionId: string,
     opts?: { replace?: boolean }
-  ) => {
+  ): Promise<PrerequisiteWarning | null> => {
     const res = await registerSectionApi(sectionId, opts?.replace);
     setCourses(res.schedule.sections.map(toRegisteredCourse));
     if (typeof res.schedule.maxCredits === "number") {
       setMaxCredits(res.schedule.maxCredits);
     }
     clearSuggestionsLocally();
+    return res.prerequisiteWarning ?? null;
   };
 
   const toggleCourseLock = async (code: string) => {
@@ -335,6 +351,8 @@ export function ScheduleProvider({ children }: { children: ReactNode }) {
     try {
       const res = await generateApi();
       setSuggestions(res.suggestions);
+      setOriginalScore(res.originalScore);
+      setOriginalBlockedCourses(res.originalBlockedCourses || []);
       setHasSearched(true);
       return res;
     } finally {
@@ -402,6 +420,8 @@ export function ScheduleProvider({ children }: { children: ReactNode }) {
         offeredSections: offered,
         preferences,
         suggestions,
+        originalScore,
+        originalBlockedCourses,
         hasSearched,
         isGenerating,
         maxCredits,

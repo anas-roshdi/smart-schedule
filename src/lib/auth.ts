@@ -55,6 +55,57 @@ export async function fetchMe(): Promise<Student> {
   return res.student;
 }
 
+export interface UpdateProfilePayload {
+  name?: string;
+  email?: string;
+  currentPassword?: string;
+  gender?: string;
+  studentId?: string;
+  major?: string;
+  academicLevel?: number | string;
+  phone?: string;
+  dob?: string;
+}
+
+export async function updateProfile(patch: UpdateProfilePayload): Promise<Student> {
+  const res = await request<{ student: Student }>('/api/auth/me', {
+    method: 'PATCH',
+    body: patch,
+    auth: true,
+  });
+
+  return res.student;
+}
+
+export async function requestPasswordReset(email: string): Promise<{ message: string }> {
+  return request<{ message: string }>('/api/auth/forgot-password', {
+    method: 'POST',
+    body: { email },
+    auth: false,
+  });
+}
+
+export async function verifyResetCode(email: string, code: string): Promise<string> {
+  const res = await request<{ resetToken: string }>('/api/auth/verify-code', {
+    method: 'POST',
+    body: { email, code },
+    auth: false,
+  });
+
+  return res.resetToken;
+}
+
+export async function resetPassword(
+  resetToken: string,
+  password: string
+): Promise<{ message: string }> {
+  return request<{ message: string }>('/api/auth/reset-password', {
+    method: 'POST',
+    body: { resetToken, password },
+    auth: false,
+  });
+}
+
 export async function logout(): Promise<void> {
   await clearToken();
 }

@@ -20,6 +20,7 @@ import { RegisteredCourse } from "./data"
 import { useSchedule } from "./ScheduleContext"
 import { CourseFormModal } from "./CourseFormModal"
 import { useDialog } from "../ui/dialog-provider"
+import { PrerequisiteWarning, formatPrerequisiteWarningMessage } from "../../lib/schedule-api"
 import { useState, useRef } from "react"
 
 export function RegisteredCourses() {
@@ -32,13 +33,14 @@ export function RegisteredCourses() {
     totalCredits,
     toggleCourseLock,
   } = useSchedule()
-  const { showError } = useDialog()
+  const { showDialog, showError } = useDialog()
 
   const [formVisible, setFormVisible] = useState(false)
   const [editingCourse, setEditingCourse] = useState<RegisteredCourse | undefined>()
   const [menuFor, setMenuFor] = useState<RegisteredCourse | null>(null)
   const [deleteConfirmFor, setDeleteConfirmFor] = useState<RegisteredCourse | null>(null)
   const [isDeleting, setIsDeleting] = useState(false)
+  const pendingWarningRef = useRef<PrerequisiteWarning | null>(null)
   const pendingLocks = useRef<Set<string>>(new Set())
 
   const isOverLimit = totalCredits > maxCredits
@@ -179,6 +181,13 @@ export function RegisteredCourses() {
                             {course.credits} {course.credits === 1 ? "ساعة" : "ساعات"}
                           </Text>
                         </View>
+                        {course.prerequisites && course.prerequisites.length > 0 && (
+                          <View className="rounded bg-slate-100 px-1.5 py-0.5">
+                            <Text className="text-[10px] font-bold text-slate-600 leading-relaxed">
+                              {`يتطلب: ${course.prerequisites.join("، ")}`}
+                            </Text>
+                          </View>
+                        )}
                         {course.locked && (
                           <View className="rounded bg-amber-100 px-1.5 py-0.5">
                             <Text className="text-[10px] font-bold text-amber-800 leading-relaxed">
@@ -348,13 +357,27 @@ export function RegisteredCourses() {
         onClose={() => {
           setFormVisible(false)
           setEditingCourse(undefined)
+          if (pendingWarningRef.current) {
+            const warning = pendingWarningRef.current
+            pendingWarningRef.current = null
+            setTimeout(() => {
+              showDialog({
+                variant: "warning",
+                title: "تنبيه المتطلبات السابقة",
+                message: formatPrerequisiteWarningMessage(warning),
+              })
+            }, 100)
+          }
         }}
         initialData={editingCourse}
         onSave={async (c) => {
           if (editingCourse) {
             await updateCourse(c.id, c)
           } else {
-            await addCourse(c)
+            const warning = await addCourse(c)
+            if (warning) {
+              pendingWarningRef.current = warning
+            }
           }
         }}
       />

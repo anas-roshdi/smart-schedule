@@ -66,6 +66,15 @@ function parseTimeToMinutes(timeStr: string): number | null {
   return null;
 }
 
+function parsePrerequisites(input: string): string[] {
+  if (!input) return [];
+  const parts = input.split(/[,،\s]+/);
+  const cleaned = parts
+    .map((p) => p.replace(/\s+/g, "").toUpperCase())
+    .filter(Boolean);
+  return [...new Set(cleaned)].slice(0, 10);
+}
+
 function CourseFormContent({
   onClose,
   onSave,
@@ -77,6 +86,9 @@ function CourseFormContent({
   const [name, setName] = useState(initialData?.name || "");
   const [code, setCode] = useState(initialData?.code || "");
   const [credits, setCredits] = useState<number>(initialData?.credits ?? 3);
+  const [prerequisitesText, setPrerequisitesText] = useState<string>(
+    (initialData?.prerequisites || []).join("، ")
+  );
   const [section, setSection] = useState(initialData?.section || "");
   const [instructor, setInstructor] = useState(initialData?.instructor || "");
   const [type, setType] = useState<"نظري" | "عملي">(initialData?.type || "نظري");
@@ -210,6 +222,7 @@ function CourseFormContent({
             type,
             mode,
             sessions,
+            prerequisites: parsePrerequisites(prerequisitesText),
             status: (initialData as OfferedSection)?.status ?? "open",
           }
         : {
@@ -222,6 +235,7 @@ function CourseFormContent({
             type,
             mode,
             sessions,
+            prerequisites: parsePrerequisites(prerequisitesText),
             color: (initialData as RegisteredCourse)?.color || "bg-indigo-500",
             locked: (initialData as RegisteredCourse)?.locked ?? false,
           };
@@ -395,6 +409,38 @@ function CourseFormContent({
                   />
                 </Pressable>
               </View>
+            </View>
+
+            {/* Prerequisites */}
+            <View style={{ width: "100%" }}>
+              <Text
+                className="w-full text-sm font-semibold text-slate-700 mb-1.5 pb-0.5"
+                style={{ textAlign: "left", writingDirection: "rtl", width: "100%" }}
+              >
+                المتطلبات السابقة (رموز مفصولة بفاصلة)
+              </Text>
+              <TextInput
+                value={prerequisitesText}
+                onChangeText={(val) => {
+                  clearError();
+                  setPrerequisitesText(val);
+                }}
+                className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-800"
+                style={{
+                  textAlign: "right",
+                  textAlignVertical: "center",
+                  includeFontPadding: false,
+                }}
+                placeholder="مثال: CS101، MATH105"
+                placeholderTextColor={COLORS.slate400}
+                autoCapitalize="characters"
+              />
+              <Text
+                className="w-full text-xs text-slate-400 mt-1"
+                style={{ textAlign: "left", writingDirection: "rtl" }}
+              >
+                لأغراض التنبيه فقط، لن تمنعك من التسجيل
+              </Text>
             </View>
 
             {/* Section */}

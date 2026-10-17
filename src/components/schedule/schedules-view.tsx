@@ -223,17 +223,19 @@ function findBreaks(
 // ─── Component ───────────────────────────────────────────────────────────────
 
 export function SchedulesView() {
-  const { registeredCourses, suggestions, hasSearched, applySuggestion } = useSchedule()
+  const { registeredCourses, suggestions, hasSearched, applySuggestion, originalScore, originalBlockedCourses } = useSchedule()
   const { showDialog, showError } = useDialog()
 
   const originalSchedule = useMemo(() => {
     return toScheduleFromSections(
       "الجدول الأصلي",
       "original",
-      "📋 الجدول الحالي بدون تعديل",
+      originalScore !== null
+        ? `📋 الجدول الحالي • توافق ${originalScore}%`
+        : "📋 الجدول الحالي بدون تعديل",
       registeredCourses
     )
-  }, [registeredCourses])
+  }, [registeredCourses, originalScore])
 
   const suggestedSchedules = useMemo(() => {
     return (suggestions || []).map((sug, i) =>
@@ -278,6 +280,16 @@ export function SchedulesView() {
   const currentSchedule = schedules.find((s) => s.id === activeTab) ?? originalSchedule
   const currentSuggestion = suggestions.find((s) => s.id === activeTab)
   const currentWarnings = currentSuggestion?.prerequisiteWarnings || []
+
+  const maxSuggestionScore = useMemo(() => {
+    if (!suggestions || suggestions.length === 0) return 0
+    return Math.max(...suggestions.map((s) => s.score))
+  }, [suggestions])
+
+  const isCurrentBetterOrEqual =
+    suggestions.length > 0 &&
+    originalScore !== null &&
+    originalScore >= maxSuggestionScore
 
   const actionPlan = useMemo(() => {
     if (activeTab === "original") {
@@ -361,6 +373,24 @@ export function SchedulesView() {
         })}
       </ScrollView>
 
+      {/* ── Info banner when current schedule is better or equal to all generated suggestions ── */}
+      {isCurrentBetterOrEqual && (
+        <View className="mb-3 rounded-2xl border border-indigo-200 bg-indigo-50 p-3.5">
+          <Text style={{ textAlign: "left" }} className="text-sm font-medium text-indigo-900 leading-relaxed">
+            {`جدولك الحالي (${originalScore}%) أفضل من المقترحات المولَّدة بحسب تفضيلاتك، ويمكنك مع ذلك اعتماد أيٍّ منها إن فضّلته`}
+          </Text>
+        </View>
+      )}
+
+      {/* ── Warning in original tab when courses conflict with blocked times ── */}
+      {activeTab === "original" && originalBlockedCourses.length > 0 && (
+        <View className="mb-3 rounded-2xl border border-amber-200 bg-amber-50 p-3.5">
+          <Text style={{ textAlign: "left" }} className="text-sm font-bold text-amber-800 leading-relaxed">
+            {`المقرر(ات) ${originalBlockedCourses.join("، ")} يتعارض مع أوقاتك المحجوبة`}
+          </Text>
+        </View>
+      )}
+
       {/* ── Special cases banners ── */}
       {hasNoCourses ? (
         <View className="mb-4 self-start rounded-lg bg-slate-100 px-3 py-1.5 flex-row items-center">
@@ -380,14 +410,28 @@ export function SchedulesView() {
 
       {!hasNoCourses && (
         <>
-          {/* ── Highlight Badge ── */}
-          {currentSchedule.perk ? (
-            <View className="mb-4 self-start rounded-lg bg-amber-100 px-3 py-1.5 flex-row items-center">
-              <Text style={{ textAlign: "left" }} className="pb-1 text-sm font-bold text-amber-800">
-                {currentSchedule.perk}
+          {/* ── Highlight Badge & Comparison ── */}
+          <View className="mb-4 self-start">
+            {currentSchedule.perk ? (
+              <View className="rounded-lg bg-amber-100 px-3 py-1.5 flex-row items-center">
+                <Text style={{ textAlign: "left" }} className="pb-1 text-sm font-bold text-amber-800">
+                  {currentSchedule.perk}
+                </Text>
+              </View>
+            ) : null}
+            {activeTab !== "original" && currentSuggestion && originalScore !== null && currentSuggestion.score !== originalScore ? (
+              <Text
+                style={{ textAlign: "left" }}
+                className={`mt-1 text-xs font-bold ${
+                  currentSuggestion.score > originalScore ? "text-emerald-600" : "text-amber-600"
+                }`}
+              >
+                {currentSuggestion.score > originalScore
+                  ? `أعلى من جدولك الحالي بـ ${currentSuggestion.score - originalScore} نقطة`
+                  : `أقل من جدولك الحالي بـ ${originalScore - currentSuggestion.score} نقطة`}
               </Text>
-            </View>
-          ) : null}
+            ) : null}
+          </View>
 
           {/* ── Prerequisite Warnings Badge for active suggestion ── */}
           {activeTab !== "original" && currentWarnings.length > 0 && (
