@@ -5,7 +5,7 @@ export type ApiSectionType = "THEORY" | "PRACTICAL";
 export type ApiSectionMode = "ONSITE" | "REMOTE";
 export type ApiSectionStatus = "OPEN" | "CLOSED";
 export type ApiPreferredTime = "MORNING" | "EVENING" | "ANY";
-export type ApiScheduleDensity = "COMPACT" | "RELAXED";
+export type ApiScheduleDensity = "COMPACT" | "MEDIUM" | "RELAXED";
 
 export interface ApiSession {
   id: string;
@@ -42,6 +42,7 @@ export interface ApiPreferences {
   offDays: ApiDay[];
   density: ApiScheduleDensity;
   maxBreakMinutes: number | null;
+  minCredits: number;
   maxCredits: number;
   blockedTimes: { id?: string; startTime: string; endTime: string }[];
 }
@@ -94,11 +95,13 @@ export const PREFERRED_TIME_API_TO_UI: Record<ApiPreferredTime, "صباحي" | "
 
 export const DENSITY_UI_TO_API: Record<string, ApiScheduleDensity> = {
   "مضغوط": "COMPACT",
+  "متوسط": "MEDIUM",
   "مريح": "RELAXED",
 };
 
-export const DENSITY_API_TO_UI: Record<ApiScheduleDensity, "مضغوط" | "مريح"> = {
+export const DENSITY_API_TO_UI: Record<ApiScheduleDensity, "مضغوط" | "متوسط" | "مريح"> = {
   COMPACT: "مضغوط",
+  MEDIUM: "متوسط",
   RELAXED: "مريح",
 };
 
@@ -413,6 +416,9 @@ export function toScheduleFromSections(
 
 export function perkLabel(perks: string[]): string {
   const map: Record<string, string> = {
+    FULL_LOAD: "📚 أقصى حمل دراسي",
+    BALANCED_LOAD: "⚖️ حمل دراسي متوسط",
+    LIGHT_LOAD: "🍃 حمل دراسي خفيف",
     OFF_SUN: "✨ أوف يوم الأحد",
     OFF_MON: "✨ أوف يوم الإثنين",
     OFF_TUE: "✨ أوف يوم الثلاثاء",
@@ -421,9 +427,16 @@ export function perkLabel(perks: string[]): string {
     MORNING: "🌅 دوام صباحي",
     EVENING: "🌙 دوام مسائي",
     NO_LONG_BREAKS: "⚡ بدون بريكات طويلة",
-    COMPACT: "📦 جدول مضغوط",
   };
-  const labels = (perks || []).map((p) => map[p] || p).filter(Boolean);
+
+  const LOAD_PERKS = new Set(["FULL_LOAD", "BALANCED_LOAD", "LIGHT_LOAD"]);
+  const sortedPerks = [...(perks || [])].sort((a, b) => {
+    const aIsLoad = LOAD_PERKS.has(a) ? 0 : 1;
+    const bIsLoad = LOAD_PERKS.has(b) ? 0 : 1;
+    return aIsLoad - bIsLoad;
+  });
+
+  const labels = sortedPerks.map((p) => map[p] || p).filter(Boolean);
   if (labels.length === 0) {
     return "جدول بديل مناسب لقيودك";
   }

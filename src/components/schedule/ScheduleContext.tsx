@@ -43,6 +43,7 @@ interface ScheduleContextType {
   originalBlockedCourses: string[];
   hasSearched: boolean;
   isGenerating: boolean;
+  minCredits: number;
   maxCredits: number;
   totalCredits: number;
   isLoading: boolean;
@@ -77,6 +78,16 @@ interface ScheduleContextType {
   ) => RegisteredCourse | undefined;
 }
 
+export const DEFAULT_PREFERENCES: ApiPreferences = {
+  preferredTime: "ANY",
+  offDays: [],
+  density: "MEDIUM",
+  maxBreakMinutes: null,
+  minCredits: 12,
+  maxCredits: 18,
+  blockedTimes: [],
+};
+
 const ScheduleContext = createContext<ScheduleContextType | undefined>(
   undefined
 );
@@ -84,12 +95,15 @@ const ScheduleContext = createContext<ScheduleContextType | undefined>(
 export function ScheduleProvider({ children }: { children: ReactNode }) {
   const [courses, setCourses] = useState<RegisteredCourse[]>([]);
   const [offered, setOffered] = useState<OfferedSection[]>([]);
-  const [preferences, setPreferences] = useState<ApiPreferences | null>(null);
+  const [preferences, setPreferences] = useState<ApiPreferences | null>(
+    DEFAULT_PREFERENCES
+  );
   const [suggestions, setSuggestions] = useState<ApiSuggestion[]>([]);
   const [originalScore, setOriginalScore] = useState<number | null>(null);
   const [originalBlockedCourses, setOriginalBlockedCourses] = useState<string[]>([]);
   const [hasSearched, setHasSearched] = useState<boolean>(false);
   const [isGenerating, setIsGenerating] = useState<boolean>(false);
+  const [minCredits, setMinCredits] = useState<number>(12);
   const [maxCredits, setMaxCredits] = useState<number>(18);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -122,6 +136,9 @@ export function ScheduleProvider({ children }: { children: ReactNode }) {
       setOriginalScore(suggsRes.originalScore ?? null);
       setOriginalBlockedCourses(suggsRes.originalBlockedCourses || []);
       setHasSearched(false);
+      if (typeof prefsRes.preferences?.minCredits === "number") {
+        setMinCredits(prefsRes.preferences.minCredits);
+      }
       if (typeof prefsRes.preferences?.maxCredits === "number") {
         setMaxCredits(prefsRes.preferences.maxCredits);
       } else if (typeof scheduleRes.schedule.maxCredits === "number") {
@@ -340,6 +357,9 @@ export function ScheduleProvider({ children }: { children: ReactNode }) {
   const savePreferences = async (body: ApiPreferences) => {
     const res = await savePreferencesApi(body);
     setPreferences(res.preferences);
+    if (typeof res.preferences?.minCredits === "number") {
+      setMinCredits(res.preferences.minCredits);
+    }
     if (typeof res.preferences?.maxCredits === "number") {
       setMaxCredits(res.preferences.maxCredits);
     }
@@ -424,6 +444,7 @@ export function ScheduleProvider({ children }: { children: ReactNode }) {
         originalBlockedCourses,
         hasSearched,
         isGenerating,
+        minCredits,
         maxCredits,
         totalCredits,
         isLoading,

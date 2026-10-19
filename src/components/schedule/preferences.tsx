@@ -24,7 +24,7 @@ import {
 } from "../../lib/mappers";
 
 type PreferredTime = "صباحي" | "مسائي" | "مرن";
-type ScheduleDensity = "مضغوط" | "مريح";
+type ScheduleDensity = "مضغوط" | "متوسط" | "مريح";
 type DayOff = "الأحد" | "الإثنين" | "الثلاثاء" | "الأربعاء" | "الخميس";
 
 export interface PreferencesProps {
@@ -39,9 +39,10 @@ export function Preferences({ onGenerated, onScrollToTop }: PreferencesProps) {
 
   const [preferredTime, setPreferredTime] = useState<PreferredTime>("مرن");
   const [daysOff, setDaysOff] = useState<DayOff[]>([]);
-  const [density, setDensity] = useState<ScheduleDensity>("مريح");
+  const [density, setDensity] = useState<ScheduleDensity>("متوسط");
   const [maxBreakHours, setMaxBreakHours] = useState<number>(1.5);
   const [noMaxBreak, setNoMaxBreak] = useState(true);
+  const [minCredits, setMinCredits] = useState<number>(12);
   const [maxCredits, setMaxCredits] = useState<number>(18);
   const [hasBlockedTime, setHasBlockedTime] = useState(false);
   const [blockedTimes, setBlockedTimes] = useState<
@@ -52,11 +53,11 @@ export function Preferences({ onGenerated, onScrollToTop }: PreferencesProps) {
 
   const busy = isGenerating || isLocalSearching;
 
-  const initializedRef = useRef(false);
+  const lastLoadedPrefsRef = useRef<ApiPreferences | null>(null);
   /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(() => {
-    if (preferences && !initializedRef.current) {
-      initializedRef.current = true;
+    if (preferences && preferences !== lastLoadedPrefsRef.current) {
+      lastLoadedPrefsRef.current = preferences;
       if (preferences.preferredTime) {
         setPreferredTime(
           PREFERRED_TIME_API_TO_UI[preferences.preferredTime] ?? "مرن"
@@ -66,7 +67,7 @@ export function Preferences({ onGenerated, onScrollToTop }: PreferencesProps) {
         setDaysOff(preferences.offDays.map((d) => apiDayToUiDay(d) as DayOff));
       }
       if (preferences.density) {
-        setDensity(DENSITY_API_TO_UI[preferences.density] ?? "مريح");
+        setDensity(DENSITY_API_TO_UI[preferences.density] ?? "متوسط");
       }
       if (preferences.maxBreakMinutes === null) {
         setNoMaxBreak(true);
@@ -75,6 +76,9 @@ export function Preferences({ onGenerated, onScrollToTop }: PreferencesProps) {
         setNoMaxBreak(false);
         const hours = preferences.maxBreakMinutes / 60;
         setMaxBreakHours(Math.min(10, Math.max(0.5, hours)));
+      }
+      if (typeof preferences.minCredits === "number") {
+        setMinCredits(Math.min(30, Math.max(1, preferences.minCredits)));
       }
       if (typeof preferences.maxCredits === "number") {
         setMaxCredits(Math.min(30, Math.max(1, preferences.maxCredits)));
@@ -122,6 +126,7 @@ export function Preferences({ onGenerated, onScrollToTop }: PreferencesProps) {
   };
 
   const toggleDayOff = (day: DayOff) => {
+    setFormError(null);
     if (daysOff.includes(day)) {
       setDaysOff(daysOff.filter((d) => d !== day));
     } else {
@@ -172,8 +177,9 @@ export function Preferences({ onGenerated, onScrollToTop }: PreferencesProps) {
     const body: ApiPreferences = {
       preferredTime: PREFERRED_TIME_UI_TO_API[preferredTime] || "ANY",
       offDays: daysOff.map((d) => uiDayToApiDay(d)),
-      density: DENSITY_UI_TO_API[density] || "RELAXED",
+      density: DENSITY_UI_TO_API[density] || "MEDIUM",
       maxBreakMinutes: noMaxBreak ? null : Math.round(maxBreakHours * 60),
+      minCredits: Number(minCredits),
       maxCredits: Number(maxCredits),
       blockedTimes: hasBlockedTime ? validBlockedTimes : [],
     };
@@ -186,6 +192,18 @@ export function Preferences({ onGenerated, onScrollToTop }: PreferencesProps) {
       await generateSuggestions();
       onGenerated?.();
     } catch (err: any) {
+      const minCreditsErr = Array.isArray(err?.errors)
+        ? err.errors.find((e: any) => e.field === "minCredits")
+        : err?.field === "minCredits"
+        ? err
+        : null;
+
+      if (minCreditsErr) {
+        setFormError(minCreditsErr.message || "قيمة الحد الأدنى للساعات غير صالحة");
+        onScrollToTop?.();
+        return;
+      }
+
       if (err?.code === "EMPTY_SCHEDULE") {
         await showDialog({
           variant: "info",
@@ -320,20 +338,23 @@ export function Preferences({ onGenerated, onScrollToTop }: PreferencesProps) {
         </View>
       </View>
 
-      {/* Section 3: Schedule Density */}
+      {/* Section 3: Study Load */}
       <View className="mb-6 w-full">
         <Text
           className="text-sm font-bold text-slate-800 mb-3"
           style={{ textAlign: "left", writingDirection: "rtl" }}
         >
-          نمط الجدول
+          الحمل الدراسي
         </Text>
         <View className="flex-row bg-slate-100 rounded-xl p-1 w-full">
-          {(["مضغوط", "مريح"] as ScheduleDensity[]).map((opt) => (
+          {(["مضغوط", "متوسط", "مريح"] as ScheduleDensity[]).map((opt) => (
             <TouchableOpacity
               key={opt}
               disabled={busy}
-              onPress={() => setDensity(opt)}
+              onPress={() => {
+                setFormError(null);
+                setDensity(opt);
+              }}
               className={`flex-1 py-2.5 rounded-lg items-center justify-center ${
                 density === opt ? "bg-white" : ""
               }`}
@@ -354,10 +375,34 @@ export function Preferences({ onGenerated, onScrollToTop }: PreferencesProps) {
                   density === opt ? "text-slate-900" : "text-slate-500"
                 }`}
               >
-                {opt === "مضغوط" ? "مضغوط (متتالية)" : "مريح (فترات راحة)"}
+                {opt}
               </Text>
             </TouchableOpacity>
           ))}
+        </View>
+        <View className="mt-2.5 px-1">
+          <Text
+            className="text-xs text-slate-500 leading-relaxed"
+            style={{ textAlign: "left", writingDirection: "rtl" }}
+          >
+            {density === "مضغوط"
+              ? "يحاول إضافة أكبر عدد من المقررات ضمن الحد الأقصى للساعات"
+              : density === "متوسط"
+              ? "يستهدف عدداً متوسطاً من الساعات بين الحد الأدنى والأقصى"
+              : "يستهدف أقل عدد من الساعات قرب الحد الأدنى"}
+          </Text>
+          <Text
+            className="text-xs text-slate-500 font-semibold mt-1 leading-relaxed"
+            style={{ textAlign: "left", writingDirection: "rtl" }}
+          >
+            الهدف: نحو{" "}
+            {density === "مضغوط"
+              ? maxCredits
+              : density === "مريح"
+              ? minCredits
+              : Math.round((minCredits + maxCredits) / 2)}{" "}
+            ساعة
+          </Text>
         </View>
       </View>
 
@@ -429,43 +474,107 @@ export function Preferences({ onGenerated, onScrollToTop }: PreferencesProps) {
         </View>
       </View>
 
-      {/* Section 5: Max Credits */}
+      {/* Section 5: Credits */}
       <View className="mb-6 w-full">
         <Text
           className="text-sm font-bold text-slate-800 mb-3"
           style={{ textAlign: "left", writingDirection: "rtl" }}
         >
-          الحد الأقصى للساعات المعتمدة
+          الساعات المعتمدة
         </Text>
-        <View className="flex-row items-center justify-between w-full">
-          <View className="flex-1 flex-row items-center justify-between bg-white border border-indigo-200 rounded-2xl p-2">
-            <TouchableOpacity
-              disabled={busy || maxCredits <= 1}
-              onPress={() => setMaxCredits(Math.max(1, maxCredits - 1))}
-              className="p-2 bg-slate-50 rounded-xl"
+        <View className="gap-3 w-full">
+          {/* Min Credits */}
+          <View className="w-full">
+            <Text
+              className="text-xs font-semibold text-slate-600 mb-1.5"
+              style={{ textAlign: "left", writingDirection: "rtl" }}
             >
-              <Minus
-                size={20}
-                color={
-                  busy || maxCredits <= 1 ? COLORS.slate300 : COLORS.slate600
-                }
-              />
-            </TouchableOpacity>
-            <Text className="text-sm font-bold text-slate-800 pb-1 leading-relaxed">
-              {maxCredits} {maxCredits === 1 ? "ساعة" : "ساعات"}
+              الحد الأدنى
             </Text>
-            <TouchableOpacity
-              disabled={busy || maxCredits >= 30}
-              onPress={() => setMaxCredits(Math.min(30, maxCredits + 1))}
-              className="p-2 bg-slate-50 rounded-xl"
+            <View className="flex-row items-center justify-between bg-white border border-indigo-200 rounded-2xl p-2">
+              <TouchableOpacity
+                disabled={busy || minCredits <= 1}
+                onPress={() => {
+                  setFormError(null);
+                  setMinCredits(Math.max(1, minCredits - 1));
+                }}
+                className="p-2 bg-slate-50 rounded-xl"
+              >
+                <Minus
+                  size={20}
+                  color={
+                    busy || minCredits <= 1 ? COLORS.slate300 : COLORS.slate600
+                  }
+                />
+              </TouchableOpacity>
+              <Text className="text-sm font-bold text-slate-800 pb-1 leading-relaxed">
+                {minCredits} {minCredits === 1 ? "ساعة" : "ساعات"}
+              </Text>
+              <TouchableOpacity
+                disabled={busy || minCredits >= maxCredits || minCredits >= 30}
+                onPress={() => {
+                  setFormError(null);
+                  setMinCredits(Math.min(maxCredits, 30, minCredits + 1));
+                }}
+                className="p-2 bg-slate-50 rounded-xl"
+              >
+                <Plus
+                  size={20}
+                  color={
+                    busy || minCredits >= maxCredits || minCredits >= 30
+                      ? COLORS.slate300
+                      : COLORS.slate600
+                  }
+                />
+              </TouchableOpacity>
+            </View>
+          </View>
+
+          {/* Max Credits */}
+          <View className="w-full">
+            <Text
+              className="text-xs font-semibold text-slate-600 mb-1.5"
+              style={{ textAlign: "left", writingDirection: "rtl" }}
             >
-              <Plus
-                size={20}
-                color={
-                  busy || maxCredits >= 30 ? COLORS.slate300 : COLORS.slate600
-                }
-              />
-            </TouchableOpacity>
+              الحد الأقصى
+            </Text>
+            <View className="flex-row items-center justify-between bg-white border border-indigo-200 rounded-2xl p-2">
+              <TouchableOpacity
+                disabled={busy || maxCredits <= minCredits || maxCredits <= 1}
+                onPress={() => {
+                  setFormError(null);
+                  setMaxCredits(Math.max(minCredits, 1, maxCredits - 1));
+                }}
+                className="p-2 bg-slate-50 rounded-xl"
+              >
+                <Minus
+                  size={20}
+                  color={
+                    busy || maxCredits <= minCredits || maxCredits <= 1
+                      ? COLORS.slate300
+                      : COLORS.slate600
+                  }
+                />
+              </TouchableOpacity>
+              <Text className="text-sm font-bold text-slate-800 pb-1 leading-relaxed">
+                {maxCredits} {maxCredits === 1 ? "ساعة" : "ساعات"}
+              </Text>
+              <TouchableOpacity
+                disabled={busy || maxCredits >= 30}
+                onPress={() => {
+                  setFormError(null);
+                  setMaxCredits(Math.min(30, maxCredits + 1));
+                }}
+                className="p-2 bg-slate-50 rounded-xl"
+              >
+                <Plus
+                  size={20}
+                  color={
+                    busy || maxCredits >= 30 ? COLORS.slate300 : COLORS.slate600
+                  }
+                />
+              </TouchableOpacity>
+            </View>
           </View>
         </View>
       </View>
