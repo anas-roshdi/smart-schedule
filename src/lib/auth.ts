@@ -109,3 +109,20 @@ export async function resetPassword(
 export async function logout(): Promise<void> {
   await clearToken();
 }
+
+export async function changePassword(
+  currentPassword: string,
+  newPassword: string
+): Promise<string> {
+  const res = await request<{ message: string; token: string }>('/api/auth/password', {
+    method: 'PATCH',
+    body: { currentPassword, newPassword },
+    auth: true,
+  });
+
+  if (res.token) {
+    await setToken(res.token);
+  }
+
+  return res.message;
+}

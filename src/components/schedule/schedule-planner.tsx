@@ -4,6 +4,7 @@ import { StatusBar } from "expo-status-bar"
 import {
   BookMarked,
   CalendarRange,
+  KeyRound,
   LayoutGrid,
   SlidersHorizontal,
   User,
@@ -20,6 +21,7 @@ import {
 } from "react-native"
 import { SafeAreaView } from "react-native-safe-area-context"
 import { EditProfileModal } from "../profile/edit-profile"
+import { ChangePasswordModal } from "../profile/change-password"
 import { COLORS } from "./colors"
 import { OfferedCourses } from "./offered-courses"
 import { Preferences } from "./preferences"
@@ -52,6 +54,7 @@ function SchedulePlannerContent() {
   const [activeNav, setActiveNav] = useState<string>("registered")
   const [isProfileMenuVisible, setIsProfileMenuVisible] = useState(false)
   const [isEditProfileVisible, setIsEditProfileVisible] = useState(false)
+  const [isChangePasswordVisible, setIsChangePasswordVisible] = useState(false)
   const mainScrollRef = useRef<ScrollView>(null)
 
   return (
@@ -118,6 +121,21 @@ function SchedulePlannerContent() {
               </TouchableOpacity>
 
               <TouchableOpacity
+                className="flex-row items-center justify-center gap-2 px-4 py-3 border-b border-slate-50"
+                onPress={() => {
+                  setIsProfileMenuVisible(false)
+                  setIsChangePasswordVisible(true)
+                }}
+              >
+                <KeyRound size={18} color="#334155" />
+                <Text
+                  className="text-slate-700 font-bold text-base"
+                >
+                  تغيير كلمة المرور
+                </Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
                 className="flex-row items-center px-4 py-3"
                 onPress={async () => {
                   try {
@@ -145,6 +163,12 @@ function SchedulePlannerContent() {
       <EditProfileModal
         visible={isEditProfileVisible}
         onClose={() => setIsEditProfileVisible(false)}
+      />
+
+      {/* Change Password Modal */}
+      <ChangePasswordModal
+        visible={isChangePasswordVisible}
+        onClose={() => setIsChangePasswordVisible(false)}
       />
 
       {/* Content Area */}
