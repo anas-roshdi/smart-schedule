@@ -1,4 +1,4 @@
-import React, { useState, useRef } from "react";
+import React, { useState, useRef, useMemo } from "react";
 import {
   Modal,
   View,
@@ -9,6 +9,7 @@ import {
   StyleSheet,
   ActivityIndicator,
   Keyboard,
+  TouchableOpacity,
 } from "react-native";
 import { X, Plus, Minus, Trash2, AlertCircle } from "lucide-react-native";
 import { COLORS } from "./colors";
@@ -66,14 +67,7 @@ function parseTimeToMinutes(timeStr: string): number | null {
   return null;
 }
 
-function parsePrerequisites(input: string): string[] {
-  if (!input) return [];
-  const parts = input.split(/[,،\s]+/);
-  const cleaned = parts
-    .map((p) => p.replace(/\s+/g, "").toUpperCase())
-    .filter(Boolean);
-  return [...new Set(cleaned)].slice(0, 10);
-}
+
 
 function CourseFormContent({
   onClose,
@@ -81,14 +75,17 @@ function CourseFormContent({
   initialData,
   target,
 }: Omit<CourseFormModalProps, "visible"> & { target: "registered" | "offered" }) {
-  const { registeredCourses, offeredSections } = useSchedule();
+  const { registeredCourses, offeredSections, courseNameOf } = useSchedule();
   const scrollRef = useRef<ScrollView>(null);
   const [name, setName] = useState(initialData?.name || "");
   const [code, setCode] = useState(initialData?.code || "");
   const [credits, setCredits] = useState<number>(initialData?.credits ?? 3);
-  const [prerequisitesText, setPrerequisitesText] = useState<string>(
-    (initialData?.prerequisites || []).join("، ")
+  const [selectedPrereqs, setSelectedPrereqs] = useState<string[]>(
+    () => (initialData?.prerequisites || []).slice(0, 10)
   );
+  const [showManualInput, setShowManualInput] = useState(false);
+  const [manualCode, setManualCode] = useState("");
+  const [nameFieldError, setNameFieldError] = useState<string | null>(null);
   const [section, setSection] = useState(initialData?.section || "");
   const [instructor, setInstructor] = useState(initialData?.instructor || "");
   const [type, setType] = useState<"نظري" | "عملي">(initialData?.type || "نظري");
@@ -103,10 +100,75 @@ function CourseFormContent({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
 
+  const availableCourses = useMemo(() => {
+    const currentCode = code.trim().toUpperCase();
+    const seenCodes = new Set<string>();
+    const list: { code: string; name: string }[] = [];
+
+    for (const s of offeredSections) {
+      const sCode = s.code.trim().toUpperCase();
+      if (!sCode) continue;
+      if (currentCode && sCode === currentCode) continue;
+      if (!seenCodes.has(sCode)) {
+        seenCodes.add(sCode);
+        list.push({ code: s.code.trim(), name: s.name });
+      }
+    }
+    return list;
+  }, [offeredSections, code]);
+
   const clearError = () => {
     if (formError) {
       setFormError(null);
     }
+    if (nameFieldError) {
+      setNameFieldError(null);
+    }
+  };
+
+  const togglePrereq = (prereqCode: string) => {
+    clearError();
+    const normalized = prereqCode.trim().toUpperCase();
+    const exists = selectedPrereqs.some(
+      (c) => c.trim().toUpperCase() === normalized
+    );
+    if (exists) {
+      setSelectedPrereqs((prev) =>
+        prev.filter((c) => c.trim().toUpperCase() !== normalized)
+      );
+    } else {
+      if (selectedPrereqs.length >= 10) {
+        displayError("الحد الأقصى للمتطلبات السابقة هو 10 مقررات");
+        return;
+      }
+      setSelectedPrereqs((prev) => [...prev, normalized]);
+    }
+  };
+
+  const removePrereq = (prereqCode: string) => {
+    clearError();
+    const normalized = prereqCode.trim().toUpperCase();
+    setSelectedPrereqs((prev) =>
+      prev.filter((c) => c.trim().toUpperCase() !== normalized)
+    );
+  };
+
+  const addManualPrereq = () => {
+    clearError();
+    const cleaned = manualCode.replace(/\s+/g, "").toUpperCase();
+    if (!cleaned) return;
+    if (selectedPrereqs.some((c) => c.trim().toUpperCase() === cleaned)) {
+      setManualCode("");
+      setShowManualInput(false);
+      return;
+    }
+    if (selectedPrereqs.length >= 10) {
+      displayError("الحد الأقصى للمتطلبات السابقة هو 10 مقررات");
+      return;
+    }
+    setSelectedPrereqs((prev) => [...prev, cleaned]);
+    setManualCode("");
+    setShowManualInput(false);
   };
 
   const displayError = (msg: string) => {
@@ -222,7 +284,7 @@ function CourseFormContent({
             type,
             mode,
             sessions,
-            prerequisites: parsePrerequisites(prerequisitesText),
+            prerequisites: selectedPrereqs.slice(0, 10),
             status: (initialData as OfferedSection)?.status ?? "open",
           }
         : {
@@ -235,7 +297,7 @@ function CourseFormContent({
             type,
             mode,
             sessions,
-            prerequisites: parsePrerequisites(prerequisitesText),
+            prerequisites: selectedPrereqs.slice(0, 10),
             color: (initialData as RegisteredCourse)?.color || "bg-indigo-500",
             locked: (initialData as RegisteredCourse)?.locked ?? false,
           };
@@ -245,6 +307,16 @@ function CourseFormContent({
       await onSave(payload);
       onClose();
     } catch (err: any) {
+      if (
+        err?.code === "DUPLICATE_COURSE_NAME" ||
+        (err?.status === 409 && err?.code === "DUPLICATE_COURSE_NAME")
+      ) {
+        const msg = err.message || "اسم المقرر مسجل مسبقاً لمقرر آخر";
+        setNameFieldError(msg);
+        displayError(msg);
+        return;
+      }
+
       if (err?.sectionSaved) {
         displayError(
           `حُفظت الشعبة في قائمة المطروحة لكنها لم تُضف إلى جدولك: ${err.message || ""}. يمكنك إضافتها من تبويب المطروحة`
@@ -337,7 +409,9 @@ function CourseFormContent({
                   clearError();
                   setName(val);
                 }}
-                className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-800"
+                className={`w-full rounded-2xl border bg-white px-4 py-3 text-sm text-slate-800 ${
+                  nameFieldError ? "border-red-400" : "border-slate-200"
+                }`}
                 style={{
                   textAlign: "right",
                   textAlignVertical: "center",
@@ -346,6 +420,21 @@ function CourseFormContent({
                 placeholder="مثال: مقدمة في البرمجة"
                 placeholderTextColor={COLORS.slate400}
               />
+              {nameFieldError ? (
+                <Text
+                  className="w-full text-xs text-red-500 mt-1"
+                  style={{ textAlign: "left", writingDirection: "rtl" }}
+                >
+                  {nameFieldError}
+                </Text>
+              ) : (
+                <Text
+                  className="w-full text-xs text-slate-400 mt-1"
+                  style={{ textAlign: "left", writingDirection: "rtl" }}
+                >
+                  ميّز المقررات المتشابهة برقم، مثل: قواعد بيانات 1 وقواعد بيانات 2
+                </Text>
+              )}
             </View>
 
             {/* Course Code */}
@@ -417,29 +506,144 @@ function CourseFormContent({
                 className="w-full text-sm font-semibold text-slate-700 mb-1.5 pb-0.5"
                 style={{ textAlign: "left", writingDirection: "rtl", width: "100%" }}
               >
-                المتطلبات السابقة (رموز مفصولة بفاصلة)
+                المتطلبات السابقة
               </Text>
-              <TextInput
-                value={prerequisitesText}
-                onChangeText={(val) => {
-                  clearError();
-                  setPrerequisitesText(val);
-                }}
-                className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-800"
-                style={{
-                  textAlign: "right",
-                  textAlignVertical: "center",
-                  includeFontPadding: false,
-                }}
-                placeholder="مثال: CS101، MATH105"
-                placeholderTextColor={COLORS.slate400}
-                autoCapitalize="characters"
-              />
+
+              {/* Selected Badges */}
+              {selectedPrereqs.length > 0 && (
+                <View className="mb-2.5 flex-row flex-wrap gap-1.5">
+                  {selectedPrereqs.map((prereqCode) => {
+                    const displayName = courseNameOf(prereqCode);
+                    return (
+                      <View
+                        key={prereqCode}
+                        className="flex-row items-center gap-1.5 rounded-xl border border-indigo-200 bg-indigo-50 px-2.5 py-1"
+                      >
+                        <Text className="text-xs font-bold text-indigo-800">
+                          {displayName}
+                        </Text>
+                        <Pressable
+                          onPress={() => removePrereq(prereqCode)}
+                          hitSlop={8}
+                          className="rounded-full p-0.5"
+                        >
+                          <X size={12} color="#4338ca" />
+                        </Pressable>
+                      </View>
+                    );
+                  })}
+                </View>
+              )}
+
+              {/* Available Courses to Choose From */}
+              {availableCourses.length > 0 ? (
+                <View className="rounded-2xl border border-slate-200 bg-slate-50/50 p-2.5">
+                  <Text
+                    className="mb-2 text-xs font-medium text-slate-500"
+                    style={{ textAlign: "left", writingDirection: "rtl" }}
+                  >
+                    اختر المقررات المتطلبة:
+                  </Text>
+                  <View className="flex-row flex-wrap gap-1.5">
+                    {availableCourses.map((c) => {
+                      const isSelected = selectedPrereqs.some(
+                        (p) => p.trim().toUpperCase() === c.code.toUpperCase()
+                      );
+                      return (
+                        <Pressable
+                          key={c.code}
+                          onPress={() => togglePrereq(c.code)}
+                          className={`flex-row items-center gap-1.5 rounded-xl border px-2.5 py-1.5 ${
+                            isSelected
+                              ? "border-indigo-600 bg-indigo-50"
+                              : "border-slate-200 bg-white"
+                          }`}
+                        >
+                          <Text
+                            className={`text-xs font-bold ${
+                              isSelected ? "text-indigo-700" : "text-slate-800"
+                            }`}
+                          >
+                            {c.name}
+                          </Text>
+                          <Text className="text-[10px] text-slate-400">
+                            ({c.code})
+                          </Text>
+                        </Pressable>
+                      );
+                    })}
+                  </View>
+                </View>
+              ) : (
+                <View className="rounded-xl border border-slate-200 bg-slate-50 p-2.5">
+                  <Text
+                    className="text-xs text-slate-400"
+                    style={{ textAlign: "left", writingDirection: "rtl" }}
+                  >
+                    لا توجد مقررات أخرى مطروحة بالقائمة
+                  </Text>
+                </View>
+              )}
+
+              {/* Link to Add Unlisted Course Code */}
+              {!showManualInput ? (
+                <TouchableOpacity
+                  onPress={() => setShowManualInput(true)}
+                  className="mt-2 self-start"
+                >
+                  <Text className="text-xs font-semibold text-indigo-600 underline">
+                    مقرر غير موجود في القائمة؟
+                  </Text>
+                </TouchableOpacity>
+              ) : (
+                <View className="mt-2.5 rounded-2xl border border-slate-200 bg-white p-3">
+                  <Text
+                    className="text-xs font-semibold text-slate-700 mb-1.5"
+                    style={{ textAlign: "left", writingDirection: "rtl" }}
+                  >
+                    إدخال رمز مقرر يدوي:
+                  </Text>
+                  <View className="flex-row items-center gap-2">
+                    <TextInput
+                      value={manualCode}
+                      onChangeText={(val) => {
+                        clearError();
+                        setManualCode(val.replace(/\s+/g, "").toUpperCase());
+                      }}
+                      className="flex-1 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs text-slate-800"
+                      style={{
+                        textAlign: "right",
+                        textAlignVertical: "center",
+                        includeFontPadding: false,
+                      }}
+                      placeholder="مثال: MATH101"
+                      placeholderTextColor={COLORS.slate400}
+                      autoCapitalize="characters"
+                    />
+                    <TouchableOpacity
+                      onPress={addManualPrereq}
+                      className="rounded-xl bg-indigo-600 px-3.5 py-2"
+                    >
+                      <Text className="text-xs font-bold text-white">إضافة</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      onPress={() => {
+                        setManualCode("");
+                        setShowManualInput(false);
+                      }}
+                      className="rounded-xl bg-slate-100 px-2.5 py-2"
+                    >
+                      <Text className="text-xs font-bold text-slate-600">إلغاء</Text>
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              )}
+
               <Text
-                className="w-full text-xs text-slate-400 mt-1"
+                className="w-full text-xs text-slate-400 mt-1.5"
                 style={{ textAlign: "left", writingDirection: "rtl" }}
               >
-                لأغراض التنبيه فقط، لن تمنعك من التسجيل
+                لأغراض التنبيه فقط، لن تمنعك من التسجيل (بحد أقصى 10)
               </Text>
             </View>
 

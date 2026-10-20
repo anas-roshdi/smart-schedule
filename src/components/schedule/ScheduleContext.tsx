@@ -76,6 +76,7 @@ interface ScheduleContextType {
     code: string,
     type: string
   ) => RegisteredCourse | undefined;
+  courseNameOf: (code: string) => string;
 }
 
 export const DEFAULT_PREFERENCES: ApiPreferences = {
@@ -433,6 +434,23 @@ export function ScheduleProvider({ children }: { children: ReactNode }) {
     );
   };
 
+  const courseNameOf = useCallback(
+    (code: string): string => {
+      if (!code) return "";
+      const normalized = code.trim().toUpperCase();
+      const foundOffered = offered.find(
+        (s) => s.code.trim().toUpperCase() === normalized
+      );
+      if (foundOffered?.name) return foundOffered.name;
+      const foundRegistered = courses.find(
+        (c) => c.code.trim().toUpperCase() === normalized
+      );
+      if (foundRegistered?.name) return foundRegistered.name;
+      return code;
+    },
+    [offered, courses]
+  );
+
   return (
     <ScheduleContext.Provider
       value={{
@@ -466,6 +484,7 @@ export function ScheduleProvider({ children }: { children: ReactNode }) {
         isCourseLocked,
         checkConflict,
         getCourseByCodeAndType,
+        courseNameOf,
       }}
     >
       {children}

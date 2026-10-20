@@ -339,6 +339,7 @@ export interface Schedule {
   title: string;
   perk: string;
   days: DaySchedule[];
+  totalCredits?: number;
 }
 
 export const ALL_SCHEDULE_DAYS = [
@@ -353,7 +354,8 @@ export function toScheduleFromSections(
   title: string,
   id: string,
   perk: string,
-  sections: (ApiSection & { locked?: boolean })[] | RegisteredCourse[]
+  sections: (ApiSection & { locked?: boolean })[] | RegisteredCourse[],
+  totalCredits?: number
 ): Schedule {
   const dayBuckets = new Map<string, CourseEntry[]>();
   for (const d of ALL_SCHEDULE_DAYS) {
@@ -411,6 +413,7 @@ export function toScheduleFromSections(
     title,
     perk,
     days,
+    totalCredits,
   };
 }
 

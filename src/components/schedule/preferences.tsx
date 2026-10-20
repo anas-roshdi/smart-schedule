@@ -212,11 +212,16 @@ export function Preferences({ onGenerated, onScrollToTop }: PreferencesProps) {
             "سجّل مقرراً واحداً على الأقل في جدولك قبل البحث عن مقترحات",
         });
       } else if (err?.code === "LOCKED_COURSE_UNAVAILABLE") {
-        const courseCode = err?.details?.courseCode || "";
         await showDialog({
           variant: "warning",
           title: "مقرر مثبّت لا يمكن جدولته",
-          message: `المقرر ${courseCode} ليس له شعبة تناسب قيودك (مثل الأوقات المحجوبة). فُكّ تثبيته من تبويب المسجلة أو عدّل تفضيلاتك`,
+          message: err?.message || "أحد المقررات المثبتة ليس له شعبة تناسب قيودك. فُكّ تثبيته من تبويب المسجلة أو عدّل تفضيلاتك",
+        });
+      } else if (err?.code === "LOCKED_CREDITS_EXCEED_MAX") {
+        await showDialog({
+          variant: "warning",
+          title: "المقررات المثبّتة تتجاوز الحد الأقصى",
+          message: err?.message || "المقررات المثبتة تتجاوز الحد الأقصى للساعات",
         });
       } else if (err?.code === "NO_VALID_SCHEDULE") {
         await showDialog({

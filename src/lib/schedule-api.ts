@@ -13,10 +13,20 @@ export interface PrerequisiteWarning {
   inSchedule: string[];
 }
 
-export function formatPrerequisiteWarningMessage(warning: PrerequisiteWarning): string {
-  let msg = `المقرر ${warning.courseCode} يتطلب اجتياز: ${warning.prerequisites.join("، ")}. تأكد من اجتيازها قبل اعتماد التسجيل في بوابة الجامعة.`;
+export function formatPrerequisiteWarningMessage(
+  warning: PrerequisiteWarning,
+  nameResolver: (code: string) => string = (c) => c
+): string {
+  const courseName = nameResolver(warning.courseCode);
+  const prereqNames = warning.prerequisites
+    .map((p) => `«${nameResolver(p)}»`)
+    .join("، ");
+  let msg = `المقرر «${courseName}» يتطلب اجتياز: ${prereqNames}. تأكد من اجتيازها قبل اعتماد التسجيل في بوابة الجامعة.`;
   if (warning.inSchedule && warning.inSchedule.length > 0) {
-    msg += `\nملاحظة: ${warning.inSchedule.join("، ")} مسجل في جدولك لهذا الفصل، أي أنك لم تجتزه بعد.`;
+    const inScheduleNames = warning.inSchedule
+      .map((c) => `«${nameResolver(c)}»`)
+      .join("، ");
+    msg += `\nملاحظة: ${inScheduleNames} مسجل في جدولك لهذا الفصل، أي أنك لم تجتزه بعد.`;
   }
   return msg;
 }

@@ -223,7 +223,16 @@ function findBreaks(
 // ─── Component ───────────────────────────────────────────────────────────────
 
 export function SchedulesView() {
-  const { registeredCourses, suggestions, hasSearched, applySuggestion, originalScore, originalBlockedCourses } = useSchedule()
+  const {
+    registeredCourses,
+    suggestions,
+    hasSearched,
+    applySuggestion,
+    originalScore,
+    originalBlockedCourses,
+    totalCredits,
+    courseNameOf,
+  } = useSchedule()
   const { showDialog, showError } = useDialog()
 
   const originalSchedule = useMemo(() => {
@@ -233,9 +242,10 @@ export function SchedulesView() {
       originalScore !== null
         ? `📋 الجدول الحالي • توافق ${originalScore}%`
         : "📋 الجدول الحالي بدون تعديل",
-      registeredCourses
+      registeredCourses,
+      totalCredits
     )
-  }, [registeredCourses, originalScore])
+  }, [registeredCourses, originalScore, totalCredits])
 
   const suggestedSchedules = useMemo(() => {
     return (suggestions || []).map((sug, i) =>
@@ -243,7 +253,8 @@ export function SchedulesView() {
         `مقترح ${i + 1} (${sug.score}%)`,
         sug.id,
         perkLabel(sug.perks),
-        sug.sections
+        sug.sections,
+        sug.totalCredits
       )
     )
   }, [suggestions])
@@ -358,15 +369,21 @@ export function SchedulesView() {
             <TouchableOpacity
               key={schedule.id}
               onPress={() => setActiveTab(schedule.id)}
-              className={`mr-3 rounded-full px-5 py-2 ${
+              className={`mr-3 rounded-2xl px-4 py-2 items-center justify-center ${
                 isActive ? "bg-indigo-600" : "bg-white border border-slate-200"
               }`}
             >
               <Text
-                style={{ textAlign: "left" }}
-                className={`pb-1 font-bold ${isActive ? "text-white" : "text-slate-600"}`}
+                style={{ textAlign: "center" }}
+                className={`font-bold text-sm ${isActive ? "text-white" : "text-slate-700"}`}
               >
                 {schedule.title}
+              </Text>
+              <Text
+                style={{ textAlign: "center" }}
+                className={`text-xs mt-0.5 ${isActive ? "text-indigo-100" : "text-slate-400"}`}
+              >
+                {`${schedule.totalCredits ?? 0} ساعة`}
               </Text>
             </TouchableOpacity>
           )
@@ -386,7 +403,7 @@ export function SchedulesView() {
       {activeTab === "original" && originalBlockedCourses.length > 0 && (
         <View className="mb-3 rounded-2xl border border-amber-200 bg-amber-50 p-3.5">
           <Text style={{ textAlign: "left" }} className="text-sm font-bold text-amber-800 leading-relaxed">
-            {`المقرر(ات) ${originalBlockedCourses.join("، ")} يتعارض مع أوقاتك المحجوبة`}
+            {`المقرر(ات) ${originalBlockedCourses.map((c) => `«${courseNameOf(c)}»`).join("، ")} يتعارض مع أوقاتك المحجوبة`}
           </Text>
         </View>
       )}
@@ -411,7 +428,19 @@ export function SchedulesView() {
       {!hasNoCourses && (
         <>
           {/* ── Highlight Badge & Comparison ── */}
-          <View className="mb-4 self-start">
+          <View className="mb-4 self-start flex-row flex-wrap items-center gap-2">
+            {/* Total Credits Badge */}
+            <View className="rounded-lg bg-indigo-50 border border-indigo-100 px-3 py-1.5 flex-row items-center gap-1.5">
+              <Text style={{ textAlign: "left" }} className="text-xs font-bold text-indigo-900 leading-relaxed">
+                {`إجمالي الساعات: ${currentSchedule.totalCredits ?? 0} ساعة`}
+              </Text>
+              {activeTab !== "original" && (currentSchedule.totalCredits ?? 0) !== totalCredits && (
+                <Text className="text-xs font-semibold text-slate-400">
+                  {`(${(currentSchedule.totalCredits ?? 0) - totalCredits > 0 ? `+${(currentSchedule.totalCredits ?? 0) - totalCredits}` : (currentSchedule.totalCredits ?? 0) - totalCredits})`}
+                </Text>
+              )}
+            </View>
+
             {currentSchedule.perk ? (
               <View className="rounded-lg bg-amber-100 px-3 py-1.5 flex-row items-center">
                 <Text style={{ textAlign: "left" }} className="pb-1 text-sm font-bold text-amber-800">
@@ -422,7 +451,7 @@ export function SchedulesView() {
             {activeTab !== "original" && currentSuggestion && originalScore !== null && currentSuggestion.score !== originalScore ? (
               <Text
                 style={{ textAlign: "left" }}
-                className={`mt-1 text-xs font-bold ${
+                className={`text-xs font-bold ${
                   currentSuggestion.score > originalScore ? "text-emerald-600" : "text-amber-600"
                 }`}
               >
@@ -445,7 +474,7 @@ export function SchedulesView() {
                     style={{ textAlign: "left" }}
                     className="pb-0.5 text-xs font-bold text-amber-800 leading-relaxed"
                   >
-                    {`تنبيه: المقرر ${w.courseCode} يتطلب اجتياز ${w.prerequisites.join("، ")} — تأكد من ذلك قبل التسجيل`}
+                    {`المقرر «${courseNameOf(w.courseCode)}» يتطلب اجتياز: ${w.prerequisites.map((p) => `«${courseNameOf(p)}»`).join("، ")} — تأكد من ذلك قبل التسجيل`}
                   </Text>
                 </View>
               ))}
@@ -846,6 +875,7 @@ function ActionPlanModal({
   snapshot: ActionPlanSnapshot | null
   onApply: (id: string) => Promise<void>
 }) {
+  const { courseNameOf } = useSchedule()
   const [confirmStep, setConfirmStep] = useState<ConfirmStep>("plan")
   const [isApplying, setIsApplying] = useState(false)
 
@@ -912,7 +942,7 @@ function ActionPlanModal({
                         style={{ textAlign: "left" }}
                         className="pb-0.5 text-xs font-bold text-amber-800 leading-relaxed"
                       >
-                        {`تنبيه: المقرر ${w.courseCode} يتطلب اجتياز ${w.prerequisites.join("، ")} — تأكد من ذلك قبل التسجيل`}
+                        {`المقرر «${courseNameOf(w.courseCode)}» يتطلب اجتياز: ${w.prerequisites.map((p) => `«${courseNameOf(p)}»`).join("، ")} — تأكد من ذلك قبل التسجيل`}
                       </Text>
                     </View>
                   ))}

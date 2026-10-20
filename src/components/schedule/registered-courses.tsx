@@ -32,6 +32,7 @@ export function RegisteredCourses() {
     maxCredits,
     totalCredits,
     toggleCourseLock,
+    courseNameOf,
   } = useSchedule()
   const { showDialog, showError } = useDialog()
 
@@ -184,7 +185,7 @@ export function RegisteredCourses() {
                         {course.prerequisites && course.prerequisites.length > 0 && (
                           <View className="rounded bg-slate-100 px-1.5 py-0.5">
                             <Text className="text-[10px] font-bold text-slate-600 leading-relaxed">
-                              {`يتطلب: ${course.prerequisites.join("، ")}`}
+                              {`يتطلب: ${course.prerequisites.map(courseNameOf).join("، ")}`}
                             </Text>
                           </View>
                         )}
@@ -364,7 +365,7 @@ export function RegisteredCourses() {
               showDialog({
                 variant: "warning",
                 title: "تنبيه المتطلبات السابقة",
-                message: formatPrerequisiteWarningMessage(warning),
+                message: formatPrerequisiteWarningMessage(warning, courseNameOf),
               })
             }, 100)
           }
