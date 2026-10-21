@@ -11,7 +11,8 @@ import {
   Keyboard,
   TouchableOpacity,
 } from "react-native";
-import { X, Plus, Minus, Trash2, AlertCircle } from "lucide-react-native";
+import { X, Plus, Minus, Trash2, AlertCircle, Check } from "lucide-react-native";
+import { matchesName } from "../../lib/arabic-search";
 import { COLORS } from "./colors";
 import { RegisteredCourse, OfferedSection, Session } from "./data";
 import { useSchedule } from "./ScheduleContext";
@@ -85,6 +86,8 @@ function CourseFormContent({
   );
   const [showManualInput, setShowManualInput] = useState(false);
   const [manualCode, setManualCode] = useState("");
+  const [isPickerOpen, setIsPickerOpen] = useState(false);
+  const [prereqSearch, setPrereqSearch] = useState("");
   const [nameFieldError, setNameFieldError] = useState<string | null>(null);
   const [section, setSection] = useState(initialData?.section || "");
   const [instructor, setInstructor] = useState(initialData?.instructor || "");
@@ -535,54 +538,30 @@ function CourseFormContent({
                 </View>
               )}
 
-              {/* Available Courses to Choose From */}
-              {availableCourses.length > 0 ? (
-                <View className="rounded-2xl border border-slate-200 bg-slate-50/50 p-2.5">
-                  <Text
-                    className="mb-2 text-xs font-medium text-slate-500"
-                    style={{ textAlign: "left", writingDirection: "rtl" }}
-                  >
-                    اختر المقررات المتطلبة:
+              {/* Prerequisite Picker */}
+              {!isPickerOpen ? (
+                <Pressable
+                  onPress={() => {
+                    clearError();
+                    setPrereqSearch("");
+                    setIsPickerOpen(true);
+                  }}
+                  className="self-start flex-row items-center gap-1.5 rounded-xl bg-indigo-50 px-3 py-2"
+                >
+                  <Plus size={14} color={COLORS.indigo600} />
+                  <Text className="text-xs font-bold text-indigo-600 pb-0.5 leading-relaxed">
+                    إضافة متطلب
                   </Text>
-                  <View className="flex-row flex-wrap gap-1.5">
-                    {availableCourses.map((c) => {
-                      const isSelected = selectedPrereqs.some(
-                        (p) => p.trim().toUpperCase() === c.code.toUpperCase()
-                      );
-                      return (
-                        <Pressable
-                          key={c.code}
-                          onPress={() => togglePrereq(c.code)}
-                          className={`flex-row items-center gap-1.5 rounded-xl border px-2.5 py-1.5 ${
-                            isSelected
-                              ? "border-indigo-600 bg-indigo-50"
-                              : "border-slate-200 bg-white"
-                          }`}
-                        >
-                          <Text
-                            className={`text-xs font-bold ${
-                              isSelected ? "text-indigo-700" : "text-slate-800"
-                            }`}
-                          >
-                            {c.name}
-                          </Text>
-                          <Text className="text-[10px] text-slate-400">
-                            ({c.code})
-                          </Text>
-                        </Pressable>
-                      );
-                    })}
-                  </View>
-                </View>
+                </Pressable>
               ) : (
-                <View className="rounded-xl border border-slate-200 bg-slate-50 p-2.5">
-                  <Text
-                    className="text-xs text-slate-400"
-                    style={{ textAlign: "left", writingDirection: "rtl" }}
-                  >
-                    لا توجد مقررات أخرى مطروحة بالقائمة
-                  </Text>
-                </View>
+                <PrereqPicker
+                  availableCourses={availableCourses}
+                  selectedPrereqs={selectedPrereqs}
+                  prereqSearch={prereqSearch}
+                  onSearchChange={setPrereqSearch}
+                  onToggle={togglePrereq}
+                  onClose={() => setIsPickerOpen(false)}
+                />
               )}
 
               {/* Link to Add Unlisted Course Code */}
@@ -895,6 +874,162 @@ function CourseFormContent({
           )}
         </Pressable>
       </View>
+    </View>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// PrereqPicker – inline collapsible search picker for prerequisites
+// ---------------------------------------------------------------------------
+
+interface PrereqPickerProps {
+  availableCourses: { code: string; name: string }[];
+  selectedPrereqs: string[];
+  prereqSearch: string;
+  onSearchChange: (v: string) => void;
+  onToggle: (code: string) => void;
+  onClose: () => void;
+}
+
+const PICKER_MAX = 20;
+
+function PrereqPicker({
+  availableCourses,
+  selectedPrereqs,
+  prereqSearch,
+  onSearchChange,
+  onToggle,
+  onClose,
+}: PrereqPickerProps) {
+  const filtered = useMemo(() => {
+    const unselected: { code: string; name: string }[] = [];
+    const selected: { code: string; name: string }[] = [];
+
+    for (const c of availableCourses) {
+      const isSelected = selectedPrereqs.some(
+        (p) => p.trim().toUpperCase() === c.code.trim().toUpperCase()
+      );
+      if (matchesName(c.name, prereqSearch)) {
+        if (isSelected) {
+          selected.push(c);
+        } else {
+          unselected.push(c);
+        }
+      }
+    }
+
+    const cmp = (a: { name: string }, b: { name: string }) =>
+      a.name.localeCompare(b.name, "ar");
+
+    unselected.sort(cmp);
+    selected.sort(cmp);
+
+    return [...unselected, ...selected];
+  }, [availableCourses, selectedPrereqs, prereqSearch]);
+
+  const visibleItems = filtered.slice(0, PICKER_MAX);
+  const overflow = filtered.length - PICKER_MAX;
+
+  const isEmpty = availableCourses.length === 0;
+  const noMatch = !isEmpty && filtered.length === 0;
+
+  return (
+    <View className="rounded-2xl border border-indigo-200 bg-white overflow-hidden">
+      {/* Search bar */}
+      <View className="flex-row items-center gap-2 px-3 py-2 border-b border-slate-100">
+        <TextInput
+          autoFocus
+          value={prereqSearch}
+          onChangeText={onSearchChange}
+          placeholder="ابحث باسم المقرر"
+          placeholderTextColor={COLORS.slate400}
+          className="flex-1 text-sm text-slate-800"
+          style={{
+            textAlign: "right",
+            textAlignVertical: "center",
+            includeFontPadding: false,
+          }}
+        />
+        <Pressable
+          onPress={onClose}
+          hitSlop={8}
+          className="p-1 rounded-full bg-slate-100"
+        >
+          <X size={16} color={COLORS.slate600} />
+        </Pressable>
+      </View>
+
+      {/* Results */}
+      <ScrollView
+        style={{ maxHeight: 240 }}
+        nestedScrollEnabled
+        keyboardShouldPersistTaps="handled"
+        showsVerticalScrollIndicator={false}
+      >
+        {isEmpty ? (
+          <Text
+            className="text-xs text-slate-400 px-3 py-3"
+            style={{ textAlign: "left", writingDirection: "rtl" }}
+          >
+            لا توجد مقررات أخرى مطروحة بالقائمة
+          </Text>
+        ) : noMatch ? (
+          <Text
+            className="text-xs text-slate-400 px-3 py-3"
+            style={{ textAlign: "left", writingDirection: "rtl" }}
+          >
+            لا توجد نتائج مطابقة
+          </Text>
+        ) : (
+          <>
+            {visibleItems.map((c) => {
+              const isSelected = selectedPrereqs.some(
+                (p) => p.trim().toUpperCase() === c.code.trim().toUpperCase()
+              );
+              return (
+                <Pressable
+                  key={c.code}
+                  onPress={() => onToggle(c.code)}
+                  className={`flex-row items-center justify-between px-3 py-2.5 border-b border-slate-50 ${
+                    isSelected ? "bg-indigo-50/70" : "bg-white"
+                  }`}
+                >
+                  <View className="flex-row items-center gap-1.5 flex-shrink flex-1 justify-end">
+                    <Text
+                      className="text-xs text-slate-400"
+                      style={{ textAlign: "right" }}
+                    >
+                      ({c.code})
+                    </Text>
+                    <Text
+                      className={`text-xs font-semibold flex-shrink ${
+                        isSelected ? "text-indigo-700" : "text-slate-800"
+                      }`}
+                      style={{ textAlign: "right" }}
+                      numberOfLines={1}
+                    >
+                      {c.name}
+                    </Text>
+                  </View>
+                  {isSelected ? (
+                    <Check size={16} color="#4338ca" style={{ marginLeft: 8 }} />
+                  ) : (
+                    <View style={{ width: 16, marginLeft: 8 }} />
+                  )}
+                </Pressable>
+              );
+            })}
+            {overflow > 0 && (
+              <Text
+                className="text-xs text-slate-400 px-3 py-2"
+                style={{ textAlign: "left", writingDirection: "rtl" }}
+              >
+                و{overflow} نتيجة أخرى، اكتب أكثر للتضييق
+              </Text>
+            )}
+          </>
+        )}
+      </ScrollView>
     </View>
   );
 }
