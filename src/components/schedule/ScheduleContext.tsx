@@ -77,6 +77,7 @@ interface ScheduleContextType {
     type: string
   ) => RegisteredCourse | undefined;
   courseNameOf: (code: string) => string;
+  resetSchedule: () => void;
 }
 
 export const DEFAULT_PREFERENCES: ApiPreferences = {
@@ -115,6 +116,21 @@ export function ScheduleProvider({ children }: { children: ReactNode }) {
     setHasSearched(false);
     setOriginalScore(null);
     setOriginalBlockedCourses([]);
+  }, []);
+
+  const resetSchedule = useCallback(() => {
+    setCourses([]);
+    setOffered([]);
+    setPreferences(DEFAULT_PREFERENCES);
+    setSuggestions([]);
+    setOriginalScore(null);
+    setOriginalBlockedCourses([]);
+    setHasSearched(false);
+    setIsGenerating(false);
+    setMinCredits(12);
+    setMaxCredits(18);
+    setLoadError(null);
+    initialLoadDoneRef.current = false;
   }, []);
 
   const reload = useCallback(async () => {
@@ -485,6 +501,7 @@ export function ScheduleProvider({ children }: { children: ReactNode }) {
         checkConflict,
         getCourseByCodeAndType,
         courseNameOf,
+        resetSchedule,
       }}
     >
       {children}

@@ -126,3 +126,11 @@ export async function changePassword(
 
   return res.message;
 }
+
+export async function deleteAccount(password: string): Promise<{ message?: string }> {
+  return request<{ message?: string }>('/api/auth/delete-account', {
+    method: 'POST',
+    body: { password },
+    auth: true,
+  });
+}

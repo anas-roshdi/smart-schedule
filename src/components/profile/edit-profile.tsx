@@ -12,8 +12,11 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { ArrowRight, Eye, EyeOff } from 'lucide-react-native';
 import { ApiError } from '../../lib/api';
-import { fetchMe, updateProfile, UpdateProfilePayload } from '../../lib/auth';
+import { fetchMe, updateProfile, UpdateProfilePayload, deleteAccount } from '../../lib/auth';
+import { clearToken } from '../../lib/token-storage';
 import { useDialog } from '../ui/dialog-provider';
+import { useSchedule } from '../schedule/ScheduleContext';
+import { router } from 'expo-router';
 
 type Gender = 'أنثى' | 'ذكر';
 
@@ -79,12 +82,17 @@ function isValidStudentId(val: string): boolean {
 
 export function EditProfileModal({ visible, onClose }: EditProfileModalProps) {
   const { showDialog } = useDialog();
+  const { resetSchedule } = useSchedule();
   const scrollRef = useRef<ScrollView>(null);
   const initialDataRef = useRef<LoadedProfile | null>(null);
 
   const [isLoadingProfile, setIsLoadingProfile] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [isDeleteExpanded, setIsDeleteExpanded] = useState(false);
+  const [deletePassword, setDeletePassword] = useState('');
+  const [showDeletePassword, setShowDeletePassword] = useState(false);
   const [generalError, setGeneralError] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
 
@@ -111,6 +119,10 @@ export function EditProfileModal({ visible, onClose }: EditProfileModalProps) {
     setFieldErrors({});
     setCurrentPassword('');
     setShowCurrentPassword(false);
+    setIsDeleteExpanded(false);
+    setDeletePassword('');
+    setShowDeletePassword(false);
+    setIsDeleting(false);
 
     try {
       const student = await fetchMe();
@@ -321,6 +333,43 @@ export function EditProfileModal({ visible, onClose }: EditProfileModalProps) {
     }
   };
 
+  const handleDeleteAccount = async () => {
+    setGeneralError(null);
+    if (!deletePassword.trim()) {
+      displayGeneralError('يرجى إدخال كلمة المرور لتأكيد حذف الحساب');
+      return;
+    }
+
+    setIsDeleting(true);
+    try {
+      await deleteAccount(deletePassword.trim());
+      await clearToken();
+      resetSchedule();
+      setIsDeleteExpanded(false);
+      setDeletePassword('');
+      onClose();
+      router.replace('/');
+      setTimeout(() => {
+        showDialog({
+          variant: 'success',
+          title: 'تم حذف الحساب بنجاح',
+        });
+      }, 150);
+    } catch (err: any) {
+      if (err instanceof ApiError) {
+        if (err.code === 'WRONG_PASSWORD') {
+          displayGeneralError(err.message || 'كلمة المرور غير صحيحة');
+        } else {
+          displayGeneralError(err.message || 'تعذر حذف الحساب، حاول مرة أخرى');
+        }
+      } else {
+        displayGeneralError('حدث خطأ غير متوقع أثناء حذف الحساب');
+      }
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
   return (
     <Modal visible={visible} animationType="slide">
       <SafeAreaView className="flex-1 bg-white">
@@ -328,7 +377,7 @@ export function EditProfileModal({ visible, onClose }: EditProfileModalProps) {
         <View className="flex-row items-center border-b border-slate-100 px-5 pb-4 pt-2">
           <TouchableOpacity
             onPress={onClose}
-            disabled={isSaving}
+            disabled={isSaving || isDeleting}
             className="w-10 h-10 items-center justify-center rounded-full bg-slate-50"
           >
             <ArrowRight size={20} color="#475569" />
@@ -871,9 +920,9 @@ export function EditProfileModal({ visible, onClose }: EditProfileModalProps) {
             {/* Save Button */}
             <TouchableOpacity
               onPress={handleSave}
-              disabled={isSaving}
-              className={`mb-12 items-center justify-center rounded-2xl py-4 shadow-sm ${
-                isSaving ? 'bg-indigo-400' : 'bg-indigo-600'
+              disabled={isSaving || isDeleting}
+              className={`mb-6 items-center justify-center rounded-2xl py-4 shadow-sm ${
+                isSaving || isDeleting ? 'bg-indigo-400' : 'bg-indigo-600'
               }`}
             >
               {isSaving ? (
@@ -887,6 +936,141 @@ export function EditProfileModal({ visible, onClose }: EditProfileModalProps) {
                 </Text>
               )}
             </TouchableOpacity>
+
+            {/* Delete Account Section */}
+            <View className="mb-12 rounded-2xl border border-red-200 bg-red-50/60 p-5">
+              <Text
+                style={{ textAlign: 'left', writingDirection: 'rtl' }}
+                className="mb-1 text-base font-bold text-red-700"
+              >
+                حذف الحساب
+              </Text>
+
+              {!isDeleteExpanded ? (
+                <>
+                  <Text
+                    style={{ textAlign: 'left', writingDirection: 'rtl', lineHeight: 22 }}
+                    className="mb-4 text-xs text-red-600/90"
+                  >
+                    سيُحذف حسابك وكل مقرراتك وجداولك نهائياً ولا يمكن التراجع
+                  </Text>
+                  <TouchableOpacity
+                    onPress={() => {
+                      setIsDeleteExpanded(true);
+                      setGeneralError(null);
+                    }}
+                    disabled={isSaving || isDeleting}
+                    className="items-center justify-center rounded-xl border border-red-300 bg-white py-3 shadow-xs"
+                  >
+                    <Text
+                      style={{ textAlign: 'center' }}
+                      className="pb-0.5 text-sm font-bold text-red-600"
+                    >
+                      حذف حسابي
+                    </Text>
+                  </TouchableOpacity>
+                </>
+              ) : (
+                <View className="mt-2">
+                  <Text
+                    style={{ textAlign: 'left', writingDirection: 'rtl', lineHeight: 22 }}
+                    className="mb-4 text-xs font-semibold text-red-600"
+                  >
+                    سيُحذف حسابك وكل مقرراتك وجداولك نهائياً ولا يمكن التراجع
+                  </Text>
+
+                  <View className="mb-4">
+                    <Text
+                      style={{ textAlign: 'left', writingDirection: 'rtl' }}
+                      className="mb-2 text-xs font-bold text-slate-700"
+                    >
+                      كلمة المرور لتأكيد الحذف
+                    </Text>
+                    <View
+                      style={{
+                        direction: 'ltr',
+                        position: 'relative',
+                        justifyContent: 'center',
+                      }}
+                    >
+                      <TextInput
+                        editable={!isSaving && !isDeleting}
+                        className="rounded-xl border border-red-200 bg-white p-3.5 text-base text-slate-900"
+                        style={{
+                          paddingLeft: 44,
+                          paddingRight: 14,
+                          textAlign: 'right',
+                          writingDirection: 'rtl',
+                          textAlignVertical: 'center',
+                          includeFontPadding: false,
+                        }}
+                        placeholder="أدخل كلمة المرور الحالية"
+                        placeholderTextColor="#94a3b8"
+                        secureTextEntry={!showDeletePassword}
+                        value={deletePassword}
+                        onChangeText={(val) => {
+                          setDeletePassword(val);
+                          if (generalError) setGeneralError(null);
+                        }}
+                      />
+                      <TouchableOpacity
+                        onPress={() => setShowDeletePassword(!showDeletePassword)}
+                        style={{
+                          position: 'absolute',
+                          left: 10,
+                          zIndex: 20,
+                          padding: 4,
+                        }}
+                        activeOpacity={0.7}
+                        disabled={isSaving || isDeleting}
+                      >
+                        {showDeletePassword ? (
+                          <EyeOff color="#64748b" size={20} />
+                        ) : (
+                          <Eye color="#64748b" size={20} />
+                        )}
+                      </TouchableOpacity>
+                    </View>
+                  </View>
+
+                  <View className="flex-row gap-3">
+                    <TouchableOpacity
+                      onPress={handleDeleteAccount}
+                      disabled={isSaving || isDeleting}
+                      className="flex-1 items-center justify-center rounded-xl bg-red-600 py-3 shadow-xs"
+                    >
+                      {isDeleting ? (
+                        <ActivityIndicator color="white" />
+                      ) : (
+                        <Text
+                          style={{ textAlign: 'center' }}
+                          className="pb-0.5 text-sm font-bold text-white"
+                        >
+                          تأكيد حذف الحساب
+                        </Text>
+                      )}
+                    </TouchableOpacity>
+
+                    <TouchableOpacity
+                      onPress={() => {
+                        setIsDeleteExpanded(false);
+                        setDeletePassword('');
+                        if (generalError) setGeneralError(null);
+                      }}
+                      disabled={isSaving || isDeleting}
+                      className="rounded-xl border border-slate-200 bg-white px-5 py-3 items-center justify-center"
+                    >
+                      <Text
+                        style={{ textAlign: 'center' }}
+                        className="pb-0.5 text-sm font-bold text-slate-600"
+                      >
+                        إلغاء
+                      </Text>
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              )}
+            </View>
           </ScrollView>
         )}
       </SafeAreaView>
