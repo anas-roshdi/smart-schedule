@@ -60,10 +60,10 @@ export function Login({ onNavigate, onAuthSuccess }: LoginProps) {
       </View>
 
       <Text style={{ textAlign: 'left', writingDirection: 'rtl', lineHeight: 42 }} className="mb-2 pb-1 text-3xl font-extrabold text-slate-900 text-center">
-        مرحباً بك في جدولي الذكي
+        مرحباً بك في وتيرة
       </Text>
       <Text style={{ textAlign: 'left', writingDirection: 'rtl', lineHeight: 24 }} className="mb-8 text-sm text-slate-500 text-center px-4">
-        سجل دخولك لإدارة جدولك الجامعي بذكاء
+        سجّل دخولك لتنظيم جدولك الجامعي بذكاء
       </Text>
 
       {/* General Error */}

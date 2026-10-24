@@ -1,7 +1,7 @@
 {
   "expo": {
-    "scheme": "smartschedule",
-    "name": "smartschedule",
+    "scheme": "watira",
+    "name": "وتيرة",
     "slug": "smartschedule",
     "version": "1.0.0",
     "orientation": "portrait",
@@ -11,6 +11,7 @@
       "icon": "./assets/expo.icon"
     },
     "android": {
+      "package": "com.watira.app",
       "adaptiveIcon": {
         "backgroundColor": "#4F46E5",
         "foregroundImage": "./assets/watira-logo/adaptive-icon-foreground.png",

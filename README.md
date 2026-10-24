@@ -1,56 +1,123 @@
-# Welcome to your Expo app 👋
+# وتيرة (Watira) - واجهة الجوال (Mobile Frontend)
 
-This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
+تطبيق جوال مبني باستخدام React Native و Expo لتنظيم وتخطيط الجداول الدراسية ومتابعة الشعب والمقررات المطروحة للطلاب.
+يوفر تطبيق **وتيرة** واجهة مستخدم متكاملة لإدارة التفضيلات الأكاديمية، توليد المقترحات الذكية، وحل التعارضات عبر الاتصال بخادم الـ API.
 
-## Get started
+> **تنبيه:** هذه الواجهة مخصصة حصرياً للهواتف الذكية (Android و iOS) عبر تطبيق Expo Go أو حزم البناء الأصلية، ولا تدعم بيئة الويب (Web).
 
-1. Install dependencies
+---
 
+## المتطلبات الأساسية (Prerequisites)
+
+- **Node.js**: الإصدار 18 أو أحدث مع مدير الحزم **npm**.
+- **Expo Go**: مثبت على الهاتف المحمول (متوفر عبر Google Play و App Store).
+- **اتصال شبكة موحد**: اتصال الهاتف المحمول وجهاز الكمبيوتر بنفس الشبكة المحلية (Wi-Fi أو شبكة اتصال مشتركة) لتمكين الجوال من الوصول إلى خادم التطوير والـ API.
+- **خادم الـ Backend**: تشغيل خادم الـ API الخاص بالمشروع مسبقاً (على المنفذ الافتراضي `3000`).
+
+---
+
+## التثبيت والإعداد (Installation)
+
+1. **تثبيت حزم الاعتماديات:**
    ```bash
    npm install
    ```
 
-2. Start the app
+2. **تهيئة ملف البيئة (`.env`):**
+   انسخ ملف المتغيرات الافتراضي:
+   ```bash
+   # لأنظمة Linux / macOS:
+   cp .env.example .env
 
+   # أو في بيئة Windows PowerShell:
+   Copy-Item .env.example .env
+   ```
+
+3. **ضبط متغير `EXPO_PUBLIC_API_URL`:**
+   يحتوي ملف `.env` على المتغير الموجه للواجهة:
+   ```env
+   EXPO_PUBLIC_API_URL=http://YOUR_PC_IP:3000
+   ```
+   - **معرفة عنوان IP للحاسوب على Windows:**
+     نفّذ الأمر التالي في نافذة PowerShell:
+     ```powershell
+     ipconfig
+     ```
+     ابحث عن سطر `IPv4 Address` الخاص بمحول الشبكة المتصل (مثل `192.168.1.50`)، واستبدل `YOUR_PC_IP` بهذا العنوان.
+   - **ملاحظة هامة:** أي تعديل أو حفظ في ملف `.env` يتطلب إعادة تشغيل خادم Expo مع مسح الذاكرة المؤقتة (Clear Cache):
+     ```bash
+     npx expo start -c
+     ```
+
+---
+
+## التشغيل على Expo Go
+
+1. ابدأ تشغيل خادم التطوير:
    ```bash
    npx expo start
    ```
+2. سيظهر في نافذة الطرفية رمز استجابة سريعة (QR Code):
+   - **على Android:** افتح تطبيق **Expo Go** واضغط على **Scan QR code** لمسح الرمز ضوئياً.
+   - **على iOS:** افتح تطبيق الكاميرا الافتراضي وامسح الرمز ضوئياً ليتم نقلك تلقائياً لفتحه داخل Expo Go.
 
-In the output, you'll find options to open the app in a
+---
 
-- [development build](https://docs.expo.dev/develop/development-builds/introduction/)
-- [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
-- [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
-- [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
+## حل مشكلة ENOSPC على Windows
 
-You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
+عند مواجهة خطأ نفاذ مساحة القرص المؤقت للنظام في بيئة Windows (`ENOSPC: no space left on device` أو فشل إنشاء مسارات Metro المؤقتة على القرص `C:`):
+قم بتعيين مجلد مؤقت بديل يتوفر على مساحة كافية (مثل القرص `D:`) في نفس جلسة PowerShell، ثم أعد التشغيل:
 
-## Get a fresh project
-
-When you're ready, run:
-
-```bash
-npm run reset-project
+```powershell
+New-Item -ItemType Directory -Force -Path "D:\temp"
+$env:TEMP="D:\temp"; $env:TMP="D:\temp"
+npx expo start -c
 ```
 
-This command will move the starter code to the **app-example** directory and create a blank **app** directory where you can start developing.
+---
 
-### Other setup steps
+## الحساب التجريبي (Demo Account)
 
-- To set up ESLint for linting, run `npx expo lint`, or follow our guide on ["Using ESLint and Prettier"](https://docs.expo.dev/guides/using-eslint/)
-- If you'd like to set up unit testing, follow our guide on ["Unit Testing with Jest"](https://docs.expo.dev/develop/unit-testing/)
-- Learn more about the TypeScript setup in this template in our guide on ["Using TypeScript"](https://docs.expo.dev/guides/typescript/)
+يمكنك تسجيل الدخول بالبيانات المُجهزة تلقائياً من تغذية قاعدة بيانات الـ Backend (Database Seed):
+- **البريد الإلكتروني:** `demo@example.com`
+- **كلمة المرور:** `Demo12345`
 
-## Learn more
+---
 
-To learn more about developing your project with Expo, look at the following resources:
+## هيكل المجلد `src/` المختصر
 
-- [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
-- [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
+```text
+src/
+├── app/                  # مسارات وشاشات Expo Router الرئيسية (_layout.tsx, index.tsx, schedule-planner)
+├── components/           # مكونات واجهة المستخدم
+│   ├── auth/             # شاشات ونماذج المصادقة (تسجيل الدخول، إنشاء الحساب، التحقق واستعادة كلمة المرور)
+│   ├── profile/          # نوافذ تعديل الملف الشخصي وتغيير كلمة المرور
+│   ├── schedule/         # مكونات مخطط الجدول، استعراض الشعب، إدارة التفضيلات، ومصفوفة الجداول
+│   └── ui/               # مكونات الواجهة الموحدة (مثل AppDialog للتنبيهات والرسائل)
+├── lib/                  # الخدمات والمكتبات المساعدة (عميل الـ HTTP api.ts، التخزين، والمحولات)
+└── global.css            # ملف إعدادات أنماط وتنسيقات Tailwind CSS / NativeWind
+```
 
-## Join the community
+---
 
-Join our community of developers creating universal apps.
+## التحذيرات المعروفة غير المؤثرة (Known Non-Breaking Warnings)
 
-- [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
-- [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
+أثناء تشغيل التطبيق في بيئة التطوير، قد تظهر التحذيرات التالية في شاشة Expo / Terminal وهي طبيعية ولا تؤثر إطلاقاً على أداء أو عمل التطبيق:
+- **`useLinking`**: تحذير تنبيهي داخلي صادر عن مكتبة Expo Router ونظام الملاحة بخصوص خيارات الربط العميق، يتم التعامل معه داخلياً بشكل آمن.
+- **`SafeAreaView`**: تحذير إرشادي حول سلوك مكون الحاوية الآمنة للشاشات، ولا ينعكس سلباً على التخطيط أو تجربة الاستخدام على أجهزة الجوال.
+
+---
+
+## الحالة (Status)
+
+- **إطار الاختبارات:** لا يوجد إطار عمل مخصص للاختبارات الآلية (مثل Jest) في الوقت الراهن.
+- **التحقق من صحة الكود وجودته:** يتم الفحص الشامل وضمان خلو الكود من الأخطاء عبر الأدوات التالية:
+  - التحقق من الأنواع (TypeScript):
+    ```bash
+    npx tsc --noEmit
+    ```
+  - فحص التنسيق والأخطاء البرمجية (ESLint):
+    ```bash
+    npx expo lint
+    ```
+  (ينفذ الفحصان بنجاح دون أي أخطاء: 0 errors).
