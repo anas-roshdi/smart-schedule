@@ -29,6 +29,7 @@ import { RegisteredCourses } from "./registered-courses"
 import { ScheduleProvider, useSchedule } from "./ScheduleContext"
 import { SchedulesView } from "./schedules-view"
 import { useDialog } from "../ui/dialog-provider"
+import { WatiraLogo } from "../ui/WatiraLogo"
 
 type Tab = "registered" | "offered" | "preferences" | "schedules"
 
@@ -66,13 +67,16 @@ function SchedulePlannerContent() {
         className="flex-row items-center justify-between border-b border-slate-100 px-5 pb-4 pt-2"
         style={{ backgroundColor: "rgba(255, 255, 255, 0.9)" }}
       >
-        <View>
-          <Text className="text-xs font-medium text-slate-400 leading-relaxed">
-            الفصل الأول ١٤٤٧هـ
-          </Text>
-          <Text className="text-xl font-extrabold tracking-tight text-slate-900 leading-relaxed">
-            جدولي الذكي
-          </Text>
+        <View className="flex-row items-center gap-2">
+          <WatiraLogo size={34} variant="markDark" />
+          <View>
+            <Text className="text-xs font-medium text-slate-400 leading-relaxed">
+              الفصل الأول ١٤٤٧هـ
+            </Text>
+            <Text className="text-xl font-extrabold tracking-tight text-slate-900 leading-relaxed">
+              وتيرة
+            </Text>
+          </View>
         </View>
         <TouchableOpacity
           accessibilityRole="button"

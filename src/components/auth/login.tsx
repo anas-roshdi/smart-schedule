@@ -1,9 +1,10 @@
-import { CalendarDays, Eye, EyeOff } from 'lucide-react-native';
+import { Eye, EyeOff } from 'lucide-react-native';
 import { useState } from 'react';
 import { ActivityIndicator, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { ApiError } from '../../lib/api';
 import { login } from '../../lib/auth';
 import type { AuthView } from './auth-container';
+import { WatiraLogo } from '../ui/WatiraLogo';
 
 interface LoginProps {
   onNavigate: (view: AuthView) => void;
@@ -54,8 +55,8 @@ export function Login({ onNavigate, onAuthSuccess }: LoginProps) {
 
   return (
     <View className="flex-1 justify-center px-6">
-      <View className="h-24 w-24 rounded-full bg-indigo-100 items-center justify-center mb-6 self-center">
-        <CalendarDays color="#4f46e5" size={40} />
+      <View className="items-center mb-6">
+        <WatiraLogo size={80} variant="badge" />
       </View>
 
       <Text style={{ textAlign: 'left', writingDirection: 'rtl', lineHeight: 42 }} className="mb-2 pb-1 text-3xl font-extrabold text-slate-900 text-center">

@@ -12,6 +12,7 @@ import {
 import { ApiError } from '../../lib/api';
 import { register } from '../../lib/auth';
 import type { AuthView } from './auth-container';
+import { WatiraLogo } from '../ui/WatiraLogo';
 
 type Gender = 'أنثى' | 'ذكر';
 
@@ -235,7 +236,10 @@ export function Register({ onNavigate, onAuthSuccess }: RegisterProps) {
 
   return (
     <ScrollView keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false} className="flex-1 px-6 pt-12" contentContainerStyle={{ paddingBottom: 100 }}>
-      <Text style={{ textAlign: 'left', writingDirection: 'rtl', lineHeight: 32 }} className="mt-8 mb-8 pb-1 text-3xl font-extrabold text-slate-900 text-center">
+      <View className="items-center mb-6 mt-8">
+        <WatiraLogo size={80} variant="badge" />
+      </View>
+      <Text style={{ textAlign: 'left', writingDirection: 'rtl', lineHeight: 32 }} className="mb-8 pb-1 text-3xl font-extrabold text-slate-900 text-center">
         إنشاء حساب جديد
       </Text>
 
