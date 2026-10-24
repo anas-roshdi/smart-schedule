@@ -1,0 +1,33 @@
+{
+  "cli": {
+    "version": ">= 25.3.0",
+    "appVersionSource": "remote"
+  },
+  "build": {
+    "development": {
+      "developmentClient": true,
+      "distribution": "internal"
+    },
+    "preview": {
+      "distribution": "internal",
+      "android": {
+        "buildType": "apk"
+      },
+      "env": {
+        "EXPO_PUBLIC_API_URL": "https://smart-schedule-api-01fs.onrender.com"
+      }
+    },
+    "production": {
+      "autoIncrement": true,
+      "android": {
+        "buildType": "app-bundle"
+      },
+      "env": {
+        "EXPO_PUBLIC_API_URL": "https://smart-schedule-api-01fs.onrender.com"
+      }
+    }
+  },
+  "submit": {
+    "production": {}
+  }
+}
