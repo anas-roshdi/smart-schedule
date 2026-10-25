@@ -113,4 +113,4 @@ eas build -p android --profile preview
 
 **Anas Tilika** - Mobile Application Developer
 
-[GitHub](https://github.com/anas-roshdi) | [LinkedIn](https://www.linkedin.com/in/anas-tilika-925a6b212/) | [Portfolio](https://developer-portfolio-gules-mu.vercel.app/)
+[GitHub](https://github.com/anas-roshdi) | [LinkedIn](https://www.linkedin.com/in/anas-tilika) | [Portfolio](https://developer-portfolio-gules-mu.vercel.app/)
