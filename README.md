@@ -1,123 +1,116 @@
-# وتيرة (Watira) - واجهة الجوال (Mobile Frontend)
+# 🗓️ Watira (وتيرة) - Smart Timetable Planner for University Students
 
-تطبيق جوال مبني باستخدام React Native و Expo لتنظيم وتخطيط الجداول الدراسية ومتابعة الشعب والمقررات المطروحة للطلاب.
-يوفر تطبيق **وتيرة** واجهة مستخدم متكاملة لإدارة التفضيلات الأكاديمية، توليد المقترحات الذكية، وحل التعارضات عبر الاتصال بخادم الـ API.
+<p align="center">
+  <img src="screenshots/home.jpeg" alt="Watira Home Screen" width="300">
+</p>
 
-> **تنبيه:** هذه الواجهة مخصصة حصرياً للهواتف الذكية (Android و iOS) عبر تطبيق Expo Go أو حزم البناء الأصلية، ولا تدعم بيئة الويب (Web).
+Watira is a mobile app that helps university students build their course timetable and discover better alternatives. Students enter their registered courses and the offered sections, set their preferences (days off, morning or evening classes, maximum gaps, credit load), and Watira suggests conflict-free timetables ranked by how well they fit. Built with React Native (Expo) and TypeScript on top of a Node.js REST API.
 
----
+> **Disclaimer:** Watira is an independent project. It is not affiliated with, or endorsed by, any university. It does not register courses on any university system; the final registration is always done by the student on the official portal.
 
-## المتطلبات الأساسية (Prerequisites)
+## ✨ Features
 
-- **Node.js**: الإصدار 18 أو أحدث مع مدير الحزم **npm**.
-- **Expo Go**: مثبت على الهاتف المحمول (متوفر عبر Google Play و App Store).
-- **اتصال شبكة موحد**: اتصال الهاتف المحمول وجهاز الكمبيوتر بنفس الشبكة المحلية (Wi-Fi أو شبكة اتصال مشتركة) لتمكين الجوال من الوصول إلى خادم التطوير والـ API.
-- **خادم الـ Backend**: تشغيل خادم الـ API الخاص بالمشروع مسبقاً (على المنفذ الافتراضي `3000`).
+* **🧠 Smart Suggestions:** Generates the three best diverse timetable alternatives with a 0 to 100 score, the perks each one achieves (days off, morning or evening, no long breaks), and exactly what changes compared to your current schedule.
+* **⚙️ Personal Preferences:** Preferred time of day, days off, study load (compact, medium, relaxed), maximum break length, minimum and maximum credit hours, and blocked times such as prayer breaks.
+* **📌 Pinned Courses:** Lock the courses you must keep; the planner never drops them (it may only change their section).
+* **🚫 Conflict Detection:** Time conflicts are caught when registering a section, with a guided swap flow when another section of the same course is already registered.
+* **🔗 Prerequisites:** Warnings for missing prerequisites, and a searchable multi-select picker (Arabic-aware search) that stays usable with hundreds of courses.
+* **📱 Arabic-First UI:** A right-to-left interface with a consistent design system, dialogs, and clear Arabic error messages.
+* **🔐 Account Management:** Email and password sign-in, password reset by emailed code, profile editing, password change that signs out other sessions, and in-app account deletion.
+* **⏳ Cold-Start Friendly:** A request timeout, a wake-up ping, and a clear "waking the server" indicator, so the app behaves well on a free-tier backend.
 
----
+## 🧮 How the Scheduling Engine Works
 
-## التثبيت والإعداد (Installation)
+* **Hard constraints:** no overlapping sessions, open sections only, no overlap with blocked times, credit hours within your limits, pinned courses always kept, every added course needs a section for each component (lecture and lab), and no suggesting a course whose prerequisite you are still registered in.
+* **Search:** constraint-based backtracking with pruning that widens gradually by the number of changes (0, then 1, then 2, ...), with a safety cap on explored nodes.
+* **Scoring:** a weighted average of the preferences you enabled: days off (35), time of day (25), maximum break (20), study load (20), minus a penalty for each change (swap a section, add a course, drop a course).
+* **Transparency:** your current schedule is scored too, so the app tells you honestly when it is already better than the alternatives.
 
-1. **تثبيت حزم الاعتماديات:**
+## 🛠️ Tech Stack
+
+* **Mobile app (this repository):** React Native (Expo SDK 57), Expo Router, TypeScript, NativeWind, Context API, Expo Secure Store
+* **Backend (separate repository):** Node.js, Express 5, TypeScript, Prisma ORM, PostgreSQL, Zod validation, JWT, bcrypt, rate limiting, Helmet
+* **Testing (backend):** Vitest and Supertest, with 230+ automated tests including per-student data isolation
+* **Infrastructure:** Render (API), Neon (PostgreSQL), Brevo (transactional email), EAS Build (Android builds)
+* **Version Control:** Git & GitHub
+
+## 🏗️ Architecture
+
+```mermaid
+flowchart LR
+  A["Watira app<br/>Expo / React Native"] -->|"HTTPS + JWT"| B["REST API<br/>Node.js / Express"]
+  B --> C[("PostgreSQL<br/>Neon")]
+  B -->|"HTTP API"| D["Brevo<br/>transactional email"]
+```
+
+The server is the single source of truth: the app loads sections, schedules, and preferences from the API, and every action goes through it. The backend lives in a separate repository.
+
+## 🎨 App Screenshots
+
+### 🔐 Sign In & Planner
+| Sign In | My Schedule |
+| :---: | :---: |
+| <img src="screenshots/login.jpeg" width="250"> | <img src="screenshots/schedule.jpeg" width="250"> |
+
+### 🧠 Suggestions & Preferences
+| Suggested Alternatives | Preferences |
+| :---: | :---: |
+| <img src="screenshots/suggestions.jpeg" width="250"> | <img src="screenshots/preferences.jpeg" width="250"> |
+
+### 📚 Course Management
+| Add a Course | Prerequisites Picker |
+| :---: | :---: |
+| <img src="screenshots/courseForm.jpeg" width="250"> | <img src="screenshots/prerequisites.jpeg" width="250"> |
+
+## 📥 Download
+
+* **Android APK:** download the latest build from the [Releases](https://github.com/anas-roshdi/watira-app/releases/latest) page.
+* **Google Play:** release in preparation.
+
+> **Note:** the API runs on a free hosting tier, so the first request after a period of inactivity can take up to a minute while the server wakes up.
+
+## 🚀 Installation & Setup
+
+1. Clone the repository:
+   ```bash
+   git clone https://github.com/anas-roshdi/watira-app.git
+   ```
+2. Navigate to the project directory:
+   ```bash
+   cd watira-app
+   ```
+3. Install the dependencies:
    ```bash
    npm install
    ```
-
-2. **تهيئة ملف البيئة (`.env`):**
-   انسخ ملف المتغيرات الافتراضي:
+4. Create a `.env` file from the example and set the API address:
    ```bash
-   # لأنظمة Linux / macOS:
    cp .env.example .env
-
-   # أو في بيئة Windows PowerShell:
-   Copy-Item .env.example .env
+   # EXPO_PUBLIC_API_URL=https://your-api-host
    ```
-
-3. **ضبط متغير `EXPO_PUBLIC_API_URL`:**
-   يحتوي ملف `.env` على المتغير الموجه للواجهة:
-   ```env
-   EXPO_PUBLIC_API_URL=http://YOUR_PC_IP:3000
-   ```
-   - **معرفة عنوان IP للحاسوب على Windows:**
-     نفّذ الأمر التالي في نافذة PowerShell:
-     ```powershell
-     ipconfig
-     ```
-     ابحث عن سطر `IPv4 Address` الخاص بمحول الشبكة المتصل (مثل `192.168.1.50`)، واستبدل `YOUR_PC_IP` بهذا العنوان.
-   - **ملاحظة هامة:** أي تعديل أو حفظ في ملف `.env` يتطلب إعادة تشغيل خادم Expo مع مسح الذاكرة المؤقتة (Clear Cache):
-     ```bash
-     npx expo start -c
-     ```
-
----
-
-## التشغيل على Expo Go
-
-1. ابدأ تشغيل خادم التطوير:
+5. Start the development server:
    ```bash
    npx expo start
    ```
-2. سيظهر في نافذة الطرفية رمز استجابة سريعة (QR Code):
-   - **على Android:** افتح تطبيق **Expo Go** واضغط على **Scan QR code** لمسح الرمز ضوئياً.
-   - **على iOS:** افتح تطبيق الكاميرا الافتراضي وامسح الرمز ضوئياً ليتم نقلك تلقائياً لفتحه داخل Expo Go.
 
----
+The app needs the Watira API to work. The hosted API address used by the release builds is configured in `eas.json`. If you change `.env`, restart with `npx expo start -c`.
 
-## حل مشكلة ENOSPC على Windows
+## 📦 Building an APK
 
-عند مواجهة خطأ نفاذ مساحة القرص المؤقت للنظام في بيئة Windows (`ENOSPC: no space left on device` أو فشل إنشاء مسارات Metro المؤقتة على القرص `C:`):
-قم بتعيين مجلد مؤقت بديل يتوفر على مساحة كافية (مثل القرص `D:`) في نفس جلسة PowerShell، ثم أعد التشغيل:
-
-```powershell
-New-Item -ItemType Directory -Force -Path "D:\temp"
-$env:TEMP="D:\temp"; $env:TMP="D:\temp"
-npx expo start -c
+```bash
+npm install -g eas-cli
+eas login
+eas build -p android --profile preview
 ```
 
----
+## 🗺️ Roadmap
 
-## الحساب التجريبي (Demo Account)
+* Google Play release
+* Importing offered courses from a file, with a shared catalog per semester
+* Smaller download size through Android App Bundles
 
-يمكنك تسجيل الدخول بالبيانات المُجهزة تلقائياً من تغذية قاعدة بيانات الـ Backend (Database Seed):
-- **البريد الإلكتروني:** `demo@example.com`
-- **كلمة المرور:** `Demo12345`
+## 👤 Author
 
----
+**Anas Tilika** - Mobile Application Developer
 
-## هيكل المجلد `src/` المختصر
-
-```text
-src/
-├── app/                  # مسارات وشاشات Expo Router الرئيسية (_layout.tsx, index.tsx, schedule-planner)
-├── components/           # مكونات واجهة المستخدم
-│   ├── auth/             # شاشات ونماذج المصادقة (تسجيل الدخول، إنشاء الحساب، التحقق واستعادة كلمة المرور)
-│   ├── profile/          # نوافذ تعديل الملف الشخصي وتغيير كلمة المرور
-│   ├── schedule/         # مكونات مخطط الجدول، استعراض الشعب، إدارة التفضيلات، ومصفوفة الجداول
-│   └── ui/               # مكونات الواجهة الموحدة (مثل AppDialog للتنبيهات والرسائل)
-├── lib/                  # الخدمات والمكتبات المساعدة (عميل الـ HTTP api.ts، التخزين، والمحولات)
-└── global.css            # ملف إعدادات أنماط وتنسيقات Tailwind CSS / NativeWind
-```
-
----
-
-## التحذيرات المعروفة غير المؤثرة (Known Non-Breaking Warnings)
-
-أثناء تشغيل التطبيق في بيئة التطوير، قد تظهر التحذيرات التالية في شاشة Expo / Terminal وهي طبيعية ولا تؤثر إطلاقاً على أداء أو عمل التطبيق:
-- **`useLinking`**: تحذير تنبيهي داخلي صادر عن مكتبة Expo Router ونظام الملاحة بخصوص خيارات الربط العميق، يتم التعامل معه داخلياً بشكل آمن.
-- **`SafeAreaView`**: تحذير إرشادي حول سلوك مكون الحاوية الآمنة للشاشات، ولا ينعكس سلباً على التخطيط أو تجربة الاستخدام على أجهزة الجوال.
-
----
-
-## الحالة (Status)
-
-- **إطار الاختبارات:** لا يوجد إطار عمل مخصص للاختبارات الآلية (مثل Jest) في الوقت الراهن.
-- **التحقق من صحة الكود وجودته:** يتم الفحص الشامل وضمان خلو الكود من الأخطاء عبر الأدوات التالية:
-  - التحقق من الأنواع (TypeScript):
-    ```bash
-    npx tsc --noEmit
-    ```
-  - فحص التنسيق والأخطاء البرمجية (ESLint):
-    ```bash
-    npx expo lint
-    ```
-  (ينفذ الفحصان بنجاح دون أي أخطاء: 0 errors).
+[GitHub](https://github.com/anas-roshdi) | [LinkedIn](https://www.linkedin.com/in/anas-tilika-925a6b212/) | [Portfolio](https://developer-portfolio-gules-mu.vercel.app/)
